@@ -72,7 +72,7 @@ class BlueprintCanvas(CanvasBase):
         """Returns UI pins dict {uuid: UIPinBase}
         """
         result = {}
-        for node in self.graph_manager.getAllNodes():
+        for node in self.graph_manager.get_all_nodes():
             for pin in node.pins:
                 result[pin.uid] = pin.getWrapper()()
         return result
@@ -82,7 +82,7 @@ class BlueprintCanvas(CanvasBase):
         return self._UIConnections
 
     def on_graph_changed(self, new_graph):
-        for node in self.getAllNodes():
+        for node in self.get_all_nodes():
             bVisible = node._rawNode.graph() == new_graph
             node.setVisible(bVisible)
             for pin in node.UIPins.values():
@@ -94,7 +94,7 @@ class BlueprintCanvas(CanvasBase):
                         connection.setVisible(bVisible)
         self.validateConnections(new_graph)
 
-        for node in self.getAllNodes():
+        for node in self.get_all_nodes():
             node.updateNodeShape()
 
     def set_selected_nodes_collapsed(self, collapsed=True):
@@ -111,15 +111,15 @@ class BlueprintCanvas(CanvasBase):
     def getApp(self):
         return self.app_instance
 
-    def getAllNodes(self):
+    def get_all_nodes(self):
         """returns all ui nodes list
         """
         return list(self.nodes.values())
 
     def selectedNodes(self):
-        allNodes = self.getAllNodes()
-        assert(None not in allNodes), "Bad nodes!"
-        return [i for i in allNodes if i.isSelected()]
+        all_nodes = self.get_all_nodes()
+        assert(None not in all_nodes), "Bad nodes!"
+        return [i for i in all_nodes if i.isSelected()]
 
     def selectedConnections(self):
         return [i for i in self.connections.values() if i.isSelected()]
@@ -147,7 +147,7 @@ class BlueprintCanvas(CanvasBase):
     def shutDown(self, *args, **kwargs):
         self.scene().clear()
         self.hideNodeBox()
-        for node in self.getAllNodes():
+        for node in self.get_all_nodes():
             node.shutDown()
 
     def findPinNearPosition(self, scene_pos, tolerance=3):
@@ -298,27 +298,8 @@ class BlueprintCanvas(CanvasBase):
                     self._drawRealtimeLine = False
             else:
                 if isinstance(self.pressed_item, UIConnection) and modifiers == QtCore.Qt.AltModifier:
-                    rerouteNode = self.getRerouteNode(event.pos(), self.pressed_item)
-                    self.clearSelection()
-                    rerouteNode.setSelected(True)
-                    for inp in rerouteNode.UIinputs.values():
-                        if canConnectPins(self.pressed_item.source()._rawPin, inp._rawPin):
-                            drawPin = self.pressed_item.drawSource
-                            if self.pressed_item.source().isExec():
-                                self.pressed_item.kill()
-                            self.connectPins(self.pressed_item.source(), inp)
-                            for connection in inp.connections:
-                                connection.drawSource = drawPin
-                            break
-                    for out in rerouteNode.UIoutputs.values():
-                        drawPin = self.pressed_item.drawDestination
-                        if canConnectPins(out._rawPin, self.pressed_item.destination()._rawPin):
-                            self.connectPins(out, self.pressed_item.destination())
-                            for connection in out.connections:
-                                connection.drawDestination = drawPin
-                            break
-                    self.pressed_item = rerouteNode
-                    self.manipulationMode = CanvasManipulationMode.MOVE
+                    # TODO: actions for rerout node was here, but we don't need to consider it at this point
+                    pass
                 else:
                     if isinstance(self.pressed_item, UINodeBase):
                         if node.bResize:
@@ -518,7 +499,7 @@ class BlueprintCanvas(CanvasBase):
             # This logic allows users to use ctrl and shift with rectangle
             # select to add / remove nodes.
 
-            nodes = self.getAllNodes()
+            nodes = self.get_all_nodes()
 
             if modifiers == QtCore.Qt.ControlModifier:
                 # handle nodes
