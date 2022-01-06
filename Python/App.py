@@ -69,7 +69,7 @@ def winTitle():
 
 
 ## App itself
-class PyFlow(QtWidgets.QMainWindow):
+class App(QtWidgets.QMainWindow):
 
     appInstance = None
 
@@ -77,7 +77,7 @@ class PyFlow(QtWidgets.QMainWindow):
     fileBeenLoaded = Signal()
 
     def __init__(self, parent=None):
-        super(PyFlow, self).__init__(parent=parent)
+        super(App, self).__init__(parent=parent)
         self._modified = False
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.currentSoftware = ""
@@ -324,7 +324,7 @@ class PyFlow(QtWidgets.QMainWindow):
 
         SingletonDecorator.destroyAll()
 
-        PyFlow.appInstance = None
+        App.appInstance = None
 
         QtWidgets.QMainWindow.closeEvent(self, event)
 
@@ -332,7 +332,7 @@ class PyFlow(QtWidgets.QMainWindow):
     def instance(parent=None, software=""):
         assert(software != ""), "Invalid arguments. Please pass you software name as second argument!"
 
-        instance = PyFlow(parent)
+        instance = App(parent)
         instance.currentSoftware = software
         SessionDescriptor().software = instance.currentSoftware
 
@@ -355,6 +355,6 @@ class PyFlow(QtWidgets.QMainWindow):
         # populate menus
         instance.populateMenu()
 
-        PyFlow.appInstance = instance
+        App.appInstance = instance
 
         return instance

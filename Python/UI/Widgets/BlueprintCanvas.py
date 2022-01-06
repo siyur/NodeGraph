@@ -196,26 +196,26 @@ class BlueprintCanvas(CanvasBase):
         node_instance = self._createNode(json_template)
         return node_instance
 
-    def add_node(self, uiNode, jsonTemplate, parentGraph=None):
+    def add_node(self, ui_node, jsonTemplate, parentGraph=None):
         """Adds node to a graph
 
-        :param uiNode: Raw node wrapper
-        :type uiNode: :class:`~PyFlow.UI.Canvas.UINodeBase.UINodeBase`
+        :param ui_node: Raw node wrapper
+        :type ui_node: :class:`~PyFlow.UI.Canvas.UINodeBase.UINodeBase`
         """
 
-        uiNode.canvasRef = weakref.ref(self)
-        self.scene().addItem(uiNode)
+        ui_node.canvasRef = weakref.ref(self)
+        self.scene().addItem(ui_node)
 
         assert(jsonTemplate is not None)
 
-        if uiNode._raw_node.graph is None:
+        if ui_node._raw_node.graph is None:
             # if added from node box
-            self.graph_manager.active_graph().add_node(uiNode._raw_node, jsonTemplate)
+            self.graph_manager.active_graph().add_node(ui_node._raw_node, jsonTemplate)
         else:
             # When copy paste compound node. we are actually pasting a tree of graphs
             # So we need to put each node under correct graph
             assert(parentGraph is not None), "Parent graph is invalid"
-            parentGraph.add_node(uiNode._rawNode, jsonTemplate)
+            parentGraph.add_node(ui_node._raw_node, jsonTemplate)
 
     def mousePressEvent(self, event):
         # TODO: Move navigation part to base class
@@ -224,6 +224,7 @@ class BlueprintCanvas(CanvasBase):
         self.pressedPin = self.findPinNearPosition(event.pos())
         modifiers = event.modifiers()
         self.mousePressPose = event.pos()
+        print(self.mapToScene(event.pos()))
 
         current_input_action = InputAction("temp", "temp", InputActionType.Mouse, event.button(), modifiers=modifiers)
         if any([not self.pressed_item,

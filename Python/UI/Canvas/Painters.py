@@ -91,9 +91,9 @@ class NodePainter(object):
         color.setAlpha(230)
         if node.isSelected():
             color = color.lighter(150)
-        if node.isTemp:
-            color = color.lighter(50)
-            color.setAlpha(50)
+        # if node.isTemp:
+        #     color = color.lighter(50)
+        #     color.setAlpha(50)
 
         br = QtGui.QBrush(color)
         painter.setBrush(br)
@@ -117,9 +117,9 @@ class NodePainter(object):
             lr = QtCore.QRectF(r)
             lr.setHeight(node.label_height + NodeDefaults().CONTENT_MARGINS / 2)
             head_color = node.head_color
-            if node.isTemp:
-                head_color = head_color.lighter(50)
-                head_color.setAlpha(50)
+            # if node.isTemp:
+            #     head_color = head_color.lighter(50)
+            #     head_color.setAlpha(50)
             if lod < SWITCH_LOD:
                 b = QtGui.QLinearGradient(0, 0, lr.width(), 0)
                 b.setColorAt(0, head_color.lighter(60))

@@ -124,10 +124,9 @@ class NodeBase(INode):
         template = NodeBase.json_template()
 
         template['package'] = self.package_name
-        template['lib'] = self.lib
         template['type'] = __class__.__name__
         template['name'] = self.name
-        template['owningGraphName'] = self.graph().name
+        template['owningGraphName'] = self.graph.name
         template['uuid'] = str(self.uid)
         template['inputs'] = [i.serialize() for i in self.inputs.values()]
         template['outputs'] = [o.serialize() for o in self.outputs.values()]
@@ -138,7 +137,7 @@ class NodeBase(INode):
         # if running with ui get ui wrapper data to save
         ui_wrapper = self.get_ui()
         if ui_wrapper:
-            template['ui'] = ui_wrapper.serializationHook()
+            template['ui'] = ui_wrapper.serialization_hook()
         return template
 
     def get_ui(self):
@@ -155,6 +154,19 @@ class NodeBase(INode):
         :type ui_wrapper: Whatever gui class
         """
         self.ui = ui_wrapper
+
+    def set_position(self, x, y):
+        """Sets node coordinate on canvas
+
+        Used to correctly restore gui wrapper class
+
+        :param x: X coordinate
+        :type x: float
+        :param y: Y coordinate
+        :type y: float
+        """
+        self.x = x
+        self.y = y
 
     def set_data(self, data):
         self.data = data

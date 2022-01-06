@@ -66,7 +66,7 @@ class IItemBase(ISerializable):
     def uid(self):
         raise NotImplementedError('uid property of IItemBase can not be deleted')
 
-    def getName(self):
+    def get_name(self):
         """Returns item's name
 
         :rtype: str
@@ -75,7 +75,7 @@ class IItemBase(ISerializable):
         """
         raise NotImplementedError('getName method of IItemBase is not implemented')
 
-    def setName(self, name):
+    def set_name(self, name):
         """Sets item name
 
         :param name: Target name

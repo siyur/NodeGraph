@@ -6,14 +6,14 @@
 from PySide2 import QtWidgets, QtCore
 
 import sys
-from Python.App import PyFlow
+from Python.App import App
 from PySide2.QtWidgets import QApplication
 
 
 def main():
     app = QApplication(sys.argv)
 
-    instance = PyFlow.instance(software="standalone")
+    instance = App.instance(software="standalone")
     if instance is not None:
         app.setActiveWindow(instance)
         instance.show()

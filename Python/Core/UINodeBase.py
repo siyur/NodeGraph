@@ -119,6 +119,9 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         self.canvasRef = None
         self._menu = QtWidgets.QMenu()
 
+        # Hiding/Moving By Group/collapse/By Pin
+        self._rect = QtCore.QRectF(0, 0, self.minWidth, self.minHeight)
+
         # Resizing Options
         self.initialRectWidth = self.minWidth
         self.initialRectHeight = self.minHeight
@@ -232,6 +235,21 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
 
     def setHeaderHtml(self, html):
         self.nodeNameWidget.setHtml(html)
+
+    def serialization_hook(self):
+        # this will be called by raw node
+        # to gather ui specific info
+        template = {}
+        if self.resizable:
+            template['resize'] = {'w': self._rect.right(), 'h': self._rect.bottom()}
+        template['collapsed'] = self.collapsed
+        if len(self.groups) > 0:
+            template['groups'] = {'input': {}, 'output': {}}
+            for name, grp in self.groups['input'].items():
+                template['groups']['input'][name] = grp.expanded
+            for name, grp in self.groups['output'].items():
+                template['groups']['output'][name] = grp.expanded
+        return template
 
     def _create_UI_pin_wrapper(self, raw_pin, index=-1, group=None, linkedPin=None):
         ui = raw_pin.get_ui()

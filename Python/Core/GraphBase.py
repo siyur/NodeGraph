@@ -185,7 +185,7 @@ class GraphBase(ISerializable):
         if jsonTemplate is not None:
             jsonTemplate['name'] = self.graphManager.get_uniq_node_name(jsonTemplate['name'])
         else:
-            node.setName(self.graphManager.getUniqNodeName(node.name))
+            node.set_name(self.graphManager.get_uniq_node_name(node.name))
 
         self._nodes[node.uid] = node
         node.post_create(jsonTemplate)
