@@ -13,3 +13,11 @@ class AnyPin(PinBase):
         :type direction: :py:class:`PyFlow.Core.Common.PinDirection`
         """
         super(AnyPin, self).__init__(name, owning_node, direction, **kwargs)
+
+    @staticmethod
+    def defColor():
+        return (200, 200, 200, 255)
+
+    @staticmethod
+    def color():
+        return (200, 200, 200, 255)

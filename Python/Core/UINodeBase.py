@@ -31,8 +31,12 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         super(UINodeBase, self).__init__()
 
         # Raw Node Definition
+        self.dirty = True
         self._raw_node = raw_node or None
         self._raw_node.set_ui(self)
+        self._raw_node.killed.connect(self.kill)
+        self._raw_node.tick.connect(self.tick)
+        self._raw_node.setDirty.connect(self.setDirty)
 
         # Color and Size Options
         self.optPenSelectedType = QtCore.Qt.SolidLine
@@ -224,6 +228,29 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
                 result[raw_pin.name] = raw_pin.getWrapper()()
         return result
 
+#===============callbacks ===================
+
+    def kill(self, *args, **kwargs):
+        scene = self.scene()
+        if scene is not None:
+            self.scene().removeItem(self)
+            del(self)
+
+    def tick(self, delta, *args, **kwargs):
+        # NOTE: Do not call wrapped raw node Tick method here!
+        # this ui node tick called from underlined raw node's emitted signal
+        # do here only UI stuff
+        self.heartBeatTimeDelta += delta
+        if self.heartBeatTimeDelta >= self.heartBeatDelay:
+            self.heartBeat()
+            self.heartBeatTimeDelta = 0.0
+
+    def setDirty(self,*args, **kwargs):
+        self.dirty = True
+        self.update()
+
+    #================================
+
     def description(self):
         return self._raw_node.description()
 
@@ -307,6 +334,22 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
             self.name = new_name
             self.setHeaderHtml(new_name)
 
+    def itemChange(self, change, value):
+        if change == QtWidgets.QGraphicsItem.ItemPositionChange:
+            self._raw_node.set_position(value.x(), value.y())
+        if change == QtWidgets.QGraphicsItem.ItemVisibleChange:
+            pass
+            # TODO set visibility to false when current node is owned by a comment node
+            # if self.owningCommentNode is not None:
+            #     if self.owningCommentNode.collapsed:
+            #         self.onVisibilityChanged(False)
+            #     else:
+            #         self.onVisibilityChanged(bool(value))
+        if change == QtWidgets.QGraphicsItem.ItemSelectedChange:
+            if not value:
+                self.nodeNameWidget.labelItem.clearFocus()
+        return super(UINodeBase, self).itemChange(change, value)
+
     def update_node_shape(self):
         self.prepareGeometryChange()
         self.invalidateNodeLayouts()
@@ -333,7 +376,7 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         self.update_node_header_color()
 
         # create ui pin wrappers
-        for i in self._raw_node.getOrderedPins():
+        for i in self._raw_node.get_ordered_pins():
             self._create_UI_pin_wrapper(i)
 
         self.update_node_shape()

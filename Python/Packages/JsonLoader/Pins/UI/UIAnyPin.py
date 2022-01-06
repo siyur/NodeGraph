@@ -11,3 +11,8 @@ class UIAnyPin(UIPinBase):
         :type raw_pin: :class:`PyFlow.Packages.PyFlowBase.Pins.AnyPin`
         """
         super(UIAnyPin, self).__init__(owning_node, raw_pin)
+
+    def dataTypeBeenSet(self, *args, **kwargs):
+        self.prevColor = None
+        self.prevDataType = None
+        self.setDefault(self._rawPin.defColor())

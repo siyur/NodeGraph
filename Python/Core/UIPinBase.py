@@ -1,4 +1,6 @@
-from PySide2 import QtWidgets
+import weakref
+from PySide2 import QtCore, QtWidgets, QtGui
+from Python.Core.Common import PinDirection
 
 UI_PINS_FACTORIES = {}
 
@@ -24,6 +26,55 @@ def REGISTER_UI_PIN_FACTORY(package_name, factory):
 
 
 class UIPinBase(QtWidgets.QGraphicsItem):
-    def __init__(self, pin, parent=None):
+    def __init__(self, owning_node, raw_pin, parent=None):
         super(UIPinBase, self).__init__(parent=parent)
-        self._pin = pin or None
+        self.setGraphicsItem(self)
+        self.setFlag(QtWidgets.QGraphicsWidget.ItemSendsGeometryChanges)
+        self.setCacheMode(self.DeviceCoordinateCache)
+        self.setAcceptHoverEvents(True)
+        self.setZValue(1)
+        self.setParentItem(owning_node)
+
+        self.UiNode = weakref.ref(owning_node)
+        self._raw_pin = raw_pin or None
+
+        # GUI
+        self._font = QtGui.QFont("Consolas")
+        self._font.setPointSize(6)
+        self.pinSize = 6
+        self.hovered = False
+        self.bLabelHidden = False
+        if self._raw_pin is not None:
+            self._pinColor = QtGui.QColor(*self._raw_pin.color())
+        else:
+            self._pinColor = QtCore.Qt.white
+        self._label_color = QtCore.Qt.white
+
+    @property
+    def label_color(self):
+        return self._label_color
+
+    @label_color.setter
+    def label_color(self, value):
+        self._label_color = value
+
+    def pinCenter(self):
+        """Point relative to pin widget, where circle is drawn."""
+
+        frame = QtCore.QRectF(QtCore.QPointF(0, 0), self.geometry().size())
+        half_pin_size = self.pinSize / 2
+        pin_x = self.pinSize
+        pin_y = (frame.height() / 2)
+        if not self.bLabelHidden:
+            if self.direction == PinDirection.Output:
+                pin_x = frame.width() - self.pinSize + half_pin_size
+        result = QtCore.QPointF(pin_x, pin_y)
+        if self.owningNode().collapsed:
+            label_height = self.owningNode().label_height
+            if self.direction == PinDirection.Input:
+                result = self.mapFromItem(
+                    self.owningNode(), QtCore.QPointF(0, label_height))
+            if self.direction == PinDirection.Output:
+                result = self.mapFromItem(self.owningNode(), QtCore.QPointF(
+                    self.owningNode().sizeHint(None, None).width(), label_height))
+        return result

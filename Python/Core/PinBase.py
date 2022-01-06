@@ -1,10 +1,13 @@
 import uuid
 import weakref
 
+from copy import copy
+from blinker import Signal
 from Python.Core.Interface import IPin
 from Python.Core.Common import \
     PinDirection, \
-    disconnectPins
+    disconnectPins, \
+    getConnectedPins
 
 class PinBase(IPin):
     """
@@ -14,16 +17,29 @@ class PinBase(IPin):
     This class is intended to be subclassed for each new registered data type you want to create.
     """
 
+    _packageName = ""
+
     def __init__(self, name, owning_node, direction):
-        _packageName = ""
+        super(PinBase, self).__init__()
+        # signals
+        self.serialization_hook = Signal()
+        self.onPinConnected = Signal(object)
+        self.onPinDisconnected = Signal(object)
+        self.nameChanged = Signal(str)
+        self.killed = Signal()
+        self.onExecute = Signal(object)
+        self.markedAsDirty = Signal()
 
         # Access to the node
-        self._uid = uuid.uuid4()
         self.owning_node = weakref.ref(owning_node)
+
+        self._uid = uuid.uuid4()
+        self.dirty = True
         self.affects = set()
         self.affected_by = set()
 
         self.name = name
+        self._group = ""
         self.direction = direction
 
         # gui class weak ref
@@ -38,6 +54,20 @@ class PinBase(IPin):
             self.pin_index = len(self.owning_node().ordered_outputs)
 
     @property
+    def group(self):
+        """Pin group
+
+        This is just a tag which can be used in ui level
+
+        :rtype: str
+        """
+        return self._group
+
+    @group.setter
+    def group(self, value):
+        self._group = str(value)
+
+    @property
     def package_name(self):
         return self._packageName
 
@@ -49,6 +79,48 @@ class PinBase(IPin):
     def uid(self, value):
         if not value == self._uid:
             self._uid = value
+
+    @property
+    def linked_to(self):
+        """store connection from pins
+
+        from left hand side to right hand side
+
+        .. code-block:: python
+
+            {
+                "lhsNodeName": "", "outPinId": 0,
+                "rhsNodeName": "", "inPinId": 0
+            }
+
+        where pin id is order in which pin was added to node
+
+        :returns: Serialized connections
+        :rtype: list(dict)
+        """
+        result = list()
+        if self.direction == PinDirection.Output:
+            for i in getConnectedPins(self):
+                connection = {"lhsNodeName": "", "outPinId": 0, "rhsNodeName": "", "inPinId": 0}
+                connection["lhsNodeName"] = self.owning_node().getName()
+                connection["lhsNodeUid"] = str(self.owning_node().uid)
+                connection["outPinId"] = self.pin_index
+                connection["rhsNodeName"] = i.owning_node().getName()
+                connection["rhsNodeUid"] = str(i.owning_node().uid)
+                connection["inPinId"] = i.pinIndex
+                result.append(connection)
+
+        if self.direction == PinDirection.Input:
+            for i in getConnectedPins(self):
+                connection = {"lhsNodeName": "", "outPinId": 0, "rhsNodeName": "", "inPinId": 0}
+                connection["lhsNodeName"] = i.owning_node().getName()
+                connection["lhsNodeUid"] = str(i.owning_node().uid)
+                connection["outPinId"] = i.pinIndex
+                connection["rhsNodeName"] = self.owning_node().getName()
+                connection["rhsNodeUid"] = str(self.owning_node().uid)
+                connection["inPinId"] = self.pin_index
+                result.append(connection)
+        return result
 
     def setName(self, name):
         """Sets pin name and fires events
@@ -63,8 +135,15 @@ class PinBase(IPin):
         self.name = self.owning_node().get_uniq_pin_name(name)
         return True
 
-    def getName(self):
+    def get_name(self):
         return self.name
+
+    def get_full_name(self):
+        """Returns full pin name, including node name
+
+        :rtype: str
+        """
+        return self.owning_node().name + '_' + self.name
 
     def set_ui(self, ui_wrapper):
         """Sets ui wrapper instance
@@ -78,6 +157,14 @@ class PinBase(IPin):
         """Returns ui wrapper instance
         """
         return self.ui
+
+    def setDirty(self):
+        """Sets dirty flag to True
+        """
+        self.dirty = True
+        for i in self.affects:
+            i.dirty = True
+        self.markedAsDirty.send()
 
     def pin_connected(self, other):
         """
@@ -113,3 +200,35 @@ class PinBase(IPin):
             self.owning_node().pins.remove(self)
         if self.uid in self.owning_node().pinsCreationOrder:
             self.owning_node().pinsCreationOrder.pop(self.uid)
+
+    def call(self, *args, **kwargs):
+        if self.owning_node().isValid():
+            self.onExecute.send(*args, **kwargs)
+
+    def serialize(self):
+        """Serializes itself to json
+
+        :rtype: dict
+        """
+        data = {
+            'name': self.name,
+            'package': self.package_name,
+            'fullName': self.get_full_name(),
+            'dataType': self.__class__.__name__,
+            'direction': int(self.direction),
+            'uuid': str(self.uid),
+            'linked_to': list(self.linked_to),
+            'pin_index': self.pin_index,
+
+        }
+
+        # Wrapper class can subscribe to this signal and return
+        # UI specific data which will be considered on serialization
+        # Blinker returns a tuple (receiver, return val)
+        wrapper_data = self.serialization_hook.send(self)
+        if wrapper_data is not None:
+            if len(wrapper_data) > 0:
+                # We take return value from one wrapper
+                data['ui'] = wrapper_data[0][1]
+        return data
+

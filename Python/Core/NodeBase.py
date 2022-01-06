@@ -1,11 +1,15 @@
 import uuid
 
+from blinker import Signal
+
 from collections import OrderedDict
+from Python import CreateRawPin
 from Python.Core.Interface import INode
 from Python.Core.Common import \
     PinSelectionGroup,\
     PinDirection, \
-    getUniqNameFromList
+    getUniqNameFromList, \
+    PinOptions
 
 
 class NodePinsSuggestionsHelper(object):
@@ -30,14 +34,25 @@ class NodeBase(INode):
     _package_name = ""
 
     def __init__(self, name, uid=None):
-        self.name = name
+        super(NodeBase, self).__init__()
+        self.killed = Signal()
+        self.tick = Signal(float)
+        self.setDirty = Signal()
+
+        self.dirty = True
         self._uid = uuid.uuid4() if uid is None else uid
-        self._pins = set()
         self.graph = None
+        self.name = name
+        self.pinsCreationOrder = OrderedDict()
+        self._pins = set()
         self.x = 0.0
         self.y = 0.0
 
         self.data = "empty"
+
+        # Flags
+        self._flags = PinOptions.Storable
+        self._origFlags = self._flags
 
         # gui class weak ref
         self.ui = None
@@ -120,6 +135,9 @@ class NodeBase(INode):
     def description():
         return "Default node description"
 
+    def get_ordered_pins(self):
+        return self.pinsCreationOrder.values()
+
     def serialize(self):
         template = NodeBase.json_template()
 
@@ -186,6 +204,57 @@ class NodeBase(INode):
         """
         pin_names = [i.name for i in list(list(self.inputs.values())) + list(list(self.outputs.values()))]
         return getUniqNameFromList(pin_names, name)
+
+    def createInputPin(self, pinName, dataType, foo=None, constraint=None, group=""):
+        """Creates input pin
+
+        :param pinName: Pin name
+        :type pinName: str
+        :param dataType: Pin data type
+        :type dataType: str
+        :param foo: Pin callback. used for exec pins
+        :type foo: function
+        :param constraint: Pin constraint. Should be any hashable type. We use str
+        :type constraint: object
+        :param structConstraint: Pin struct constraint. Also should be hashable type
+        :type structConstraint: object
+        :param group: Pin group. Used only by ui wrapper
+        :type group: str
+        """
+        pinName = self.get_uniq_pin_name(pinName)
+        p = CreateRawPin(pinName, self, dataType, PinDirection.Input)
+        p.group = group
+
+
+        if foo:
+            p.onExecute.connect(foo, weak=False)
+
+        p.markedAsDirty.connect(self.setDirty.send)
+        return p
+
+    def createOutputPin(self, pinName, dataType, constraint=None, group=""):
+        """Creates output pin
+
+        :param pinName: Pin name
+        :type pinName: str
+        :param dataType: Pin data type
+        :type dataType: str
+        :param constraint: Pin constraint. Should be any hashable type. We use str
+        :type constraint: object
+        :param structConstraint: Pin struct constraint. Also should be hashable type
+        :type structConstraint: object
+        :param supportedPinDataTypes: List of allowed pin data types to be connected. Used by AnyPin
+        :type supportedPinDataTypes: list(str)
+        :param group: Pin group. Used only by ui wrapper
+        :type group: str
+        """
+        pinName = self.get_uniq_pin_name(pinName)
+        p = CreateRawPin(pinName, self, dataType, PinDirection.Output)
+        p.group = group
+
+        if constraint is not None:
+            p.updateConstraint(constraint)
+        return p
 
     def post_create(self, json_template=None):
         """Called after node was added to graph

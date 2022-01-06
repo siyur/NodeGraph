@@ -7,6 +7,7 @@ __all__ = [
     "GET_PACKAGES",
     "GET_PACKAGE_CHECKED",
     "GET_PACKAGE_PATH",
+    "CreateRawPin",
 ]
 
 __PACKAGES = {}
@@ -27,6 +28,22 @@ def GET_PACKAGE_PATH(package_name):
 def GET_PACKAGE_CHECKED(package_name):
     assert package_name in __PACKAGES
     return __PACKAGES[package_name]
+
+
+def findPinClassByType(dataType):
+    for package_name, package in GET_PACKAGES().items():
+        pins = package.GetPinClasses()
+        if dataType in pins:
+            return pins[dataType]
+    return None
+
+
+def CreateRawPin(name, owning_node, dataType, direction, **kwds):
+    pinClass = findPinClassByType(dataType)
+    if pinClass is None:
+        return None
+    inst = pinClass(name, owning_node, direction, **kwds)
+    return inst
 
 
 def INITIALIZE(additionalPackageLocations=[], software=""):

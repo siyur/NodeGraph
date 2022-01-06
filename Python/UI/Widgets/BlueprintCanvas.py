@@ -224,7 +224,6 @@ class BlueprintCanvas(CanvasBase):
         self.pressedPin = self.findPinNearPosition(event.pos())
         modifiers = event.modifiers()
         self.mousePressPose = event.pos()
-        print(self.mapToScene(event.pos()))
 
         current_input_action = InputAction("temp", "temp", InputActionType.Mouse, event.button(), modifiers=modifiers)
         if any([not self.pressed_item,
@@ -233,14 +232,7 @@ class BlueprintCanvas(CanvasBase):
                 isinstance(node, UINodeBase) and (node.resizable and node.should_resize(self.mapToScene(event.pos()))["resize"])]):
             self.resizing = False
 
-            # Create branch on B + LMB
-            if self.currentPressedKey is not None and event.button() == QtCore.Qt.LeftButton:
-                if self.currentPressedKey == QtCore.Qt.Key_B:
-                    spawnPos = self.mapToScene(self.mousePressPose)
-                    node = self.spawnNode("branch", spawnPos.x(), spawnPos.y())
-                    node.bCollapsed = False
-
-            if isinstance(node, UINodeBase) and  node.resizable:
+            if isinstance(node, UINodeBase) and node.resizable:
                 super(BlueprintCanvas, self).mousePressEvent(event)
                 self.resizing = node.bResize
                 node.setSelected(False)
@@ -282,6 +274,8 @@ class BlueprintCanvas(CanvasBase):
                 # hide nodebox
                 self.node_box.hide()
                 self.node_box.lineEdit.clear()
+
+            # pressed on a pin
             if isinstance(self.pressed_item, UIPinBase):
                 if event.button() == QtCore.Qt.LeftButton and modifiers == QtCore.Qt.NoModifier:
                     self.pressed_item.topLevelItem().setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, False)

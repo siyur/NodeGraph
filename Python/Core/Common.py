@@ -6,9 +6,9 @@ import re
 import time
 from nine import IS_PYTHON2, str
 if IS_PYTHON2:
-    from aenum import IntEnum
+    from aenum import IntEnum, Flag, auto
 else:
-    from enum import IntEnum
+    from enum import IntEnum, Flag, auto
 
 #---------------------- classes -----------------------
 
@@ -19,6 +19,29 @@ class PinSelectionGroup(IntEnum):
     Inputs = 0  #: Input pins
     Outputs = 1  #: Outputs pins
     BothSides = 2  #: Both sides pins
+
+
+class PinOptions(Flag):
+    """Used to determine how Pin behaves.
+
+    Apply flags on pin instances.
+
+    .. seealso:: :meth:`~PyFlow.Core.PinBase.PinBase.enableOptions` :meth:`~PyFlow.Core.PinBase.PinBase.disableOptions`
+    """
+
+    ArraySupported = auto()  #: Pin can hold array data structure
+    DictSupported = auto()  #: Pin can hold dict data structure
+    SupportsOnlyArrays = auto()  #: Pin will only support other pins with array data structure
+
+    AllowMultipleConnections = auto()  #: This enables pin to allow more that one input connection. See :func:`~PyFlow.Core.Common.connectPins`
+
+    ChangeTypeOnConnection = auto()  #: Used by :class:`~PyFlow.Packages.PyFlowBase.Pins.AnyPin.AnyPin` to determine if it can change its data type on new connection.
+    RenamingEnabled = auto()  #: Determines if pin can be renamed
+    Dynamic = auto()  #: Specifies if pin was created dynamically (during program runtime)
+    AlwaysPushDirty = auto()  #: Pin will always be seen as dirty (computation needed)
+    Storable = auto()  #: Determines if pin data can be stored when pin serialized
+    AllowAny = auto()  #: Special flag that allow a pin to be :class:`~PyFlow.Packages.PyFlowBase.Pins.AnyPin.AnyPin`, which means non typed without been marked as error. By default a :py:class:`PyFlow.Packages.PyFlowBase.Pins.AnyPin.AnyPin` need to be initialized with some data type, other defined pin. This flag overrides that. Used in lists and non typed nodes
+    DictElementSupported = auto()  #: Dicts are constructed with :class:`DictElement` objects. So dict pins will only allow other dicts until this flag enabled. Used in :class:`~PyFlow.Packages.PyFlowBase.Nodes.makeDict` node
 
 
 class PinDirection(IntEnum):
@@ -135,6 +158,25 @@ def pinAffects(lhs, rhs):
     assert(lhs is not rhs), "pin can not affect itself"
     lhs.affects.add(rhs)
     rhs.affected_by.add(lhs)
+
+
+def getConnectedPins(pin):
+    """Find all connected Pins to input Pin
+
+    :param pin: Pin to search connected pins
+    :type pin: :py:class:`PyFlow.Core.PinBase.PinBase`
+    :returns: Set of connected pins
+    :rtype: set(:py:class:`PyFlow.Core.PinBase.PinBase`)
+    """
+    result = set()
+    if pin.direction == PinDirection.Input:
+        for lhsPin in pin.affected_by:
+            result.add(lhsPin)
+    if pin.direction == PinDirection.Output:
+        for rhsPin in pin.affects:
+            result.add(rhsPin)
+    return result
+
 
 def canConnectPins(src, dst):
     """**Very important fundamental function, it checks if connection between two pins is possible**
@@ -312,4 +354,3 @@ def getUniqNameFromList(existingNames, name):
     idx = findGoodId(ids)
     name_no_digits = removeDigitsFromEndOfString(name)
     return name_no_digits + str(idx)
-
