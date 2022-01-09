@@ -6,9 +6,7 @@ class DictionaryNode(NodeBase):
     def __init__(self, name, uid=None):
         super(DictionaryNode, self).__init__(name, uid=None)
 
-        self.parent = self.createInputPin("In", 'AnyPin')
-
-        self.data = OrderedDict()
+        self.parent_pin = self.createInputPin("In", 'AnyPin')
 
     @staticmethod
     def category():

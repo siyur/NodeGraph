@@ -5,7 +5,7 @@ class IntNode(NodeBase):
     def __init__(self, name, uid=None):
         super(IntNode, self).__init__(name, uid=None)
 
-        self.data = 0
+        self.parent_pin = self.createInputPin("In", 'AnyPin')
 
     @staticmethod
     def category():
@@ -15,5 +15,3 @@ class IntNode(NodeBase):
     def description():
         return 'an integer node'
 
-    def set_data(self, data):
-        self.data = data
