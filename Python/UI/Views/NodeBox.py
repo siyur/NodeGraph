@@ -150,17 +150,16 @@ class NodeBoxTreeWidget(QtWidgets.QTreeWidget):
                 if dataType is None:
                     self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
                 else:
+                    hints = node_class.pin_type_hints()
                     # if pressed pin is output pin
                     # filter by nodes input types
-                    hints = node_class.pinTypeHints()
-                    if pin_direction == PinDirection.Output:
-                        if dataType in hints.input_types:
-                            self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
-                    else:
-                        # if pressed pin is input pin
-                        # filter by nodes output types
-                        if dataType in hints.output_types:
-                            self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
+                    if pin_direction == PinDirection.Output and dataType in hints.input_types:
+                        self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
+
+                    # if pressed pin is input pin
+                    # filter by nodes output types
+                    elif pin_direction == PinDirection.Input and dataType in hints.output_types:
+                        self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
 
             # expand all categories
             if dataType is not None:
@@ -333,7 +332,7 @@ class NodesBox(QtWidgets.QFrame):
 
     def onShowInfo(self, restructuredText):
         self.nodeInfoWidget.show()
-        self.nodeInfoWidget.setHtml(str(restructuredText))
+        self.nodeInfoWidget.setHtml(rst2html(restructuredText))
 
     def onHideInfo(self):
         self.nodeInfoWidget.setHtml("")
