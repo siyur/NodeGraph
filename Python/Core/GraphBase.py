@@ -175,13 +175,11 @@ class GraphBase(ISerializable):
         :type jsonTemplate: dict
         :rtype: bool
         """
-
         assert(node is not None), "failed to add node, None is passed"
         if node.uid in self._nodes:
             return False
 
-        # node.graph = weakref.ref(self)
-        node.graph = self
+        node.graph = weakref.ref(self)
         if jsonTemplate is not None:
             jsonTemplate['name'] = self.graphManager.get_uniq_node_name(jsonTemplate['name'])
         else:

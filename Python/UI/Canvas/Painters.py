@@ -247,7 +247,7 @@ class PinPainter(object):
 
     @staticmethod
     def asValuePin(pin, painter, option, widget):
-        lod = pin.owningNode().canvasRef().getCanvasLodValueFromCurrentScale()
+        lod = pin.owning_node().canvasRef().getCanvasLodValueFromCurrentScale()
         SWITCH_LOD = editableStyleSheet().PinSwitch[0]
 
         frame = QtCore.QRectF(QtCore.QPointF(0, 0), pin.geometry().size())
@@ -259,20 +259,20 @@ class PinPainter(object):
         if lod < SWITCH_LOD and not pin.bLabelHidden:
             painter.setFont(pin._font)
             textWidth = QtGui.QFontMetrics(
-                painter.font()).width(pin.displayName())
+                painter.font()).width(pin.display_name())
             textHeight = QtGui.QFontMetrics(painter.font()).height()
             x = 1 + pin.pinSize + halfPinSize
             if pin.direction == PinDirection.Output:
                 x = frame.width() - textWidth - pin.pinSize - 1
             yCenter = textHeight - textHeight / 3
             painter.setPen(QtGui.QPen(
-                pin.labelColor, 0.5, QtCore.Qt.SolidLine))
-            painter.drawText(x, yCenter, pin.displayName())
+                pin.label_color, 0.5, QtCore.Qt.SolidLine))
+            painter.drawText(x, yCenter, pin.display_name())
 
         pinCenter = pin.pinCenter()
         radialGrad = QtGui.QRadialGradient(
             pinCenter.x(), pinCenter.y() - 0.3, halfPinSize * 0.8)
-        if not pin._rawPin.hasConnections():
+        if not pin._raw_pin.hasConnections():
             radialGrad.setColorAt(0, pin.color().darker(280))
             radialGrad.setColorAt(0.5, pin.color().darker(280))
             radialGrad.setColorAt(0.65, pin.color().lighter(130))
@@ -292,7 +292,7 @@ class PinPainter(object):
 
     @staticmethod
     def asExecPin(pin, painter, option, widget):
-        lod = pin.owningNode().canvasRef().getCanvasLodValueFromCurrentScale()
+        lod = pin.owning_node().canvasRef().getCanvasLodValueFromCurrentScale()
         SWITCH_LOD = editableStyleSheet().PinSwitch[0]
         frame = QtCore.QRectF(QtCore.QPointF(0, 0), pin.geometry().size())
         w = frame.width() / 2
@@ -303,17 +303,17 @@ class PinPainter(object):
 
         if lod < SWITCH_LOD and not pin.bLabelHidden:
             textWidth = QtGui.QFontMetrics(
-                painter.font()).width(pin.displayName())
+                painter.font()).width(pin.display_name())
             textHeight = QtGui.QFontMetrics(painter.font()).height()
             x = 1 + pin.pinSize + halfPinSize
             if pin.direction == PinDirection.Output:
                 x = frame.width() - textWidth - pin.pinSize - 1
             yCenter = textHeight - textHeight / 3
             painter.setPen(QtGui.QPen(
-                pin.labelColor, 0.5, QtCore.Qt.SolidLine))
-            painter.drawText(x, yCenter, pin.displayName())
+                pin.label_color, 0.5, QtCore.Qt.SolidLine))
+            painter.drawText(x, yCenter, pin.display_name())
 
-        if pin._rawPin.hasConnections():
+        if pin._raw_pin.hasConnections():
             painter.setBrush(QtGui.QBrush(pin.color()))
         else:
             painter.setBrush(QtCore.Qt.NoBrush)
@@ -352,7 +352,7 @@ class PinPainter(object):
 
     @staticmethod
     def asArrayPin(pin, painter, option, widget):
-        lod = pin.owningNode().canvasRef().getCanvasLodValueFromCurrentScale()
+        lod = pin.owning_node().canvasRef().getCanvasLodValueFromCurrentScale()
         SWITCH_LOD = editableStyleSheet().PinSwitch[0]
         gridSize = 3
         cellW = pin.pinSize / gridSize
@@ -373,7 +373,7 @@ class PinPainter(object):
             halfPinSize = pin.pinSize / 2
             painter.setFont(pin._font)
             textWidth = QtGui.QFontMetrics(
-                painter.font()).width(pin.displayName())
+                painter.font()).width(pin.display_name())
             textHeight = QtGui.QFontMetrics(painter.font()).height()
             x = 1 + pin.pinSize + halfPinSize
             if pin.direction == PinDirection.Output:
@@ -389,7 +389,7 @@ class PinPainter(object):
 
     @staticmethod
     def asDictPin(pin, painter, option, widget):
-        lod = pin.owningNode().canvasRef().getCanvasLodValueFromCurrentScale()
+        lod = pin.owning_node().canvasRef().getCanvasLodValueFromCurrentScale()
         SWITCH_LOD = editableStyleSheet().PinSwitch[0]
         cellW = pin.pinSize / 3
         cellH = pin.pinSize / 3
@@ -397,7 +397,7 @@ class PinPainter(object):
         halfPinSize = pin.pinSize / 2
 
         painter.setBrush(QtGui.QBrush(pin.color()))
-        keyPin = findPinClassByType(pin._rawPin._keyType)
+        keyPin = findPinClassByType(pin._raw_pin._keyType)
         painter.setPen(QtGui.QPen(QtCore.Qt.black, 0.2))
         for row in range(3):
             x = pinCenter.x() - halfPinSize
@@ -413,7 +413,7 @@ class PinPainter(object):
             halfPinSize = pin.pinSize / 2
             painter.setFont(pin._font)
             textWidth = QtGui.QFontMetrics(
-                painter.font()).width(pin.displayName())
+                painter.font()).width(pin.display_name())
             textHeight = QtGui.QFontMetrics(painter.font()).height()
             x = 1 + pin.pinSize + halfPinSize
             if pin.direction == PinDirection.Output:

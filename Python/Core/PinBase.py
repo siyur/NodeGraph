@@ -37,7 +37,6 @@ class PinBase(IPin):
 
         # Access to the node
         self.owning_node = weakref.ref(owning_node)
-
         self._uid = uuid.uuid4()
         self.dirty = True
         self.affects = set()
@@ -50,6 +49,10 @@ class PinBase(IPin):
         # gui class weak ref
         self.ui = None
         self.__ui_Json_data = None
+
+        # registration
+        self.owning_node().pins.add(self)
+        self.owning_node().pins_creation_order[self.uid] = self
 
         # This is for to be able to connect pins by location on node
         self.pin_index = 0
@@ -187,6 +190,18 @@ class PinBase(IPin):
             i.dirty = True
         self.markedAsDirty.send()
 
+    def hasConnections(self):
+        """Return the number of connections this pin has
+
+        :rtype: int
+        """
+        num_connections = 0
+        if self.direction == PinDirection.Input:
+            num_connections += len(self.affected_by)
+        elif self.direction == PinDirection.Output:
+            num_connections += len(self.affects)
+        return num_connections > 0
+
     def pin_connected(self, other):
         """
         triggered when pin is connected
@@ -219,8 +234,8 @@ class PinBase(IPin):
         self.disconnect_all()
         if self in self.owning_node().pins:
             self.owning_node().pins.remove(self)
-        if self.uid in self.owning_node().pinsCreationOrder:
-            self.owning_node().pinsCreationOrder.pop(self.uid)
+        if self.uid in self.owning_node().pins_creation_order:
+            self.owning_node().pins_creation_order.pop(self.uid)
 
     def call(self, *args, **kwargs):
         if self.owning_node().is_valid():

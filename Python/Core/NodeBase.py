@@ -43,7 +43,7 @@ class NodeBase(INode):
         self._uid = uuid.uuid4() if uid is None else uid
         self.graph = None
         self.name = name
-        self.pinsCreationOrder = OrderedDict()
+        self.pins_creation_order = OrderedDict()
         self._pins = set()
         self.x = 0.0
         self.y = 0.0
@@ -75,7 +75,7 @@ class NodeBase(INode):
     @uid.setter
     def uid(self, value):
         if self.graph is not None:
-            self.graph.get_nodes()[value] = self.graph.get_nodes().pop(self._uid)
+            self.graph().get_nodes()[value] = self.graph().get_nodes().pop(self._uid)
         self._uid = value
 
     @property
@@ -165,7 +165,7 @@ class NodeBase(INode):
             ui.update()
 
     def get_ordered_pins(self):
-        return self.pinsCreationOrder.values()
+        return self.pins_creation_order.values()
 
     def serialize(self):
         template = NodeBase.json_template()
@@ -173,7 +173,7 @@ class NodeBase(INode):
         template['package'] = self.package_name
         template['type'] = __class__.__name__
         template['name'] = self.name
-        template['owningGraphName'] = self.graph.name
+        template['owningGraphName'] = self.graph().name
         template['uuid'] = str(self.uid)
         template['inputs'] = [i.serialize() for i in self.inputs.values()]
         template['outputs'] = [o.serialize() for o in self.outputs.values()]
@@ -315,7 +315,7 @@ class NodeBase(INode):
 
     def kill(self, *args, **kwargs):
 
-        if self.uid not in self.graph.get_nodes():
+        if self.uid not in self.graph().get_nodes():
             return
 
         # self.killed.send()
@@ -324,7 +324,7 @@ class NodeBase(INode):
             pin.kill()
         for pin in self.outputs.values():
             pin.kill()
-        self.graph.get_nodes().pop(self.uid)
+        self.graph().get_nodes().pop(self.uid)
 
     def get_pin_sg(self, name, pins_selection_group=PinSelectionGroup.BothSides):
         """Tries to find pin by name and selection group

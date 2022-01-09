@@ -216,6 +216,7 @@ class BlueprintCanvas(CanvasBase):
             # So we need to put each node under correct graph
             assert(parentGraph is not None), "Parent graph is invalid"
             parentGraph.add_node(ui_node._raw_node, jsonTemplate)
+        ui_node.post_create(jsonTemplate)
 
     def mousePressEvent(self, event):
         # TODO: Move navigation part to base class
@@ -478,11 +479,11 @@ class BlueprintCanvas(CanvasBase):
                 rerouteNode = self.getRerouteNode(event.pos())
                 self.clearSelection()
                 rerouteNode.setSelected(True)
-                for inp in rerouteNode.UIinputs.values():
+                for inp in rerouteNode.ui_inputs.values():
                     if canConnectPins(self.pressed_item._rawPin, inp._rawPin):
                         self.connectPins(self.pressed_item, inp)
                         break
-                for out in rerouteNode.UIoutputs.values():
+                for out in rerouteNode.ui_outputs.values():
                     if canConnectPins(self.pressed_item._rawPin, out._rawPin):
                         self.connectPins(self.pressed_item, out)
                         break
@@ -583,15 +584,15 @@ class BlueprintCanvas(CanvasBase):
                 newIns = []
                 for item in hoverItems:
                     if isinstance(item, UIConnection):
-                        if list(node.UIinputs.values())[0].connections and list(node.UIoutputs.values())[0].connections:
-                            if item.source() == list(node.UIinputs.values())[0].connections[0].source():
+                        if list(node.ui_inputs.values())[0].connections and list(node.ui_outputs.values())[0].connections:
+                            if item.source() == list(node.ui_inputs.values())[0].connections[0].source():
                                 newOuts.append([item.destination(), item.drawDestination])
-                            if item.destination() == list(node.UIoutputs.values())[0].connections[0].destination():
+                            if item.destination() == list(node.ui_outputs.values())[0].connections[0].destination():
                                 newIns.append([item.source(), item.drawSource])
                 for out in newOuts:
-                    self.connectPins(list(node.UIoutputs.values())[0], out[0])
+                    self.connectPins(list(node.ui_outputs.values())[0], out[0])
                 for inp in newIns:
-                    self.connectPins(inp[0], list(node.UIinputs.values())[0])
+                    self.connectPins(inp[0], list(node.ui_inputs.values())[0])
         elif self.manipulationMode == CanvasManipulationMode.PAN:
             self.pan(mouseDelta)
         elif self.manipulationMode == CanvasManipulationMode.ZOOM:
@@ -701,10 +702,10 @@ class BlueprintCanvas(CanvasBase):
                 for item in hoverItems:
                     if isinstance(item, UIConnection):
                         valid = False
-                        for inp in self.tempnode.UIinputs.values():
+                        for inp in self.tempnode.ui_inputs.values():
                             if canConnectPins(item.source()._rawPin, inp._rawPin):
                                 valid = True
-                        for out in self.tempnode.UIoutputs.values():
+                        for out in self.tempnode.ui_outputs.values():
                             if canConnectPins(out._rawPin, item.destination()._rawPin):
                                 valid = True
                         if valid:

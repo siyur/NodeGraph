@@ -10,48 +10,10 @@ from Python.UI.Utils.stylesheet import Colors
 from Python.Core.Common import SingletonDecorator
 
 
-def fetchPackageNames(graphJson):
-    """Parses serialized graph and returns all package names it uses
-
-    :param graphJson: Serialized graph
-    :type graphJson: dict
-    :rtyoe: list(str)
-    """
-    packages = set()
-
-    def worker(graphData):
-        for node in graphData["nodes"]:
-            packages.add(node["package"])
-
-            for inpJson in node["inputs"]:
-                packages.add(inpJson['package'])
-
-            for outJson in node["inputs"]:
-                packages.add(outJson['package'])
-
-            if "graphData" in node:
-                worker(node["graphData"])
-    worker(graphJson)
-    return packages
-
-
-def validateGraphDataPackages(graphData, missedPackages=set()):
-    """Checks if packages used in serialized data accessible
-
-    Missed packages will be added to output set
-
-    :param graphData: Serialized graph
-    :type graphData: dict
-    :param missedPackages: Package names that missed
-    :type missedPackages: str
-    :rtype: bool
-    """
-    existingPackages = GET_PACKAGES().keys()
-    graphPackages = fetchPackageNames(graphData)
-    for pkg in graphPackages:
-        if pkg not in existingPackages:
-            missedPackages.add(pkg)
-    return len(missedPackages) == 0
+class Spacings:
+    kPinSpacing = 4
+    kPinOffset = 12
+    kSplitterHandleWidth = 5
 
 
 class CanvasManipulationMode(IntEnum):
@@ -103,6 +65,50 @@ class NodeDefaults(object):
 class SessionDescriptor(object):
     def __init__(self):
         self.software = ""
+
+
+def fetchPackageNames(graphJson):
+    """Parses serialized graph and returns all package names it uses
+
+    :param graphJson: Serialized graph
+    :type graphJson: dict
+    :rtyoe: list(str)
+    """
+    packages = set()
+
+    def worker(graphData):
+        for node in graphData["nodes"]:
+            packages.add(node["package"])
+
+            for inpJson in node["inputs"]:
+                packages.add(inpJson['package'])
+
+            for outJson in node["inputs"]:
+                packages.add(outJson['package'])
+
+            if "graphData" in node:
+                worker(node["graphData"])
+    worker(graphJson)
+    return packages
+
+
+def validateGraphDataPackages(graphData, missedPackages=set()):
+    """Checks if packages used in serialized data accessible
+
+    Missed packages will be added to output set
+
+    :param graphData: Serialized graph
+    :type graphData: dict
+    :param missedPackages: Package names that missed
+    :type missedPackages: str
+    :rtype: bool
+    """
+    existingPackages = GET_PACKAGES().keys()
+    graphPackages = fetchPackageNames(graphData)
+    for pkg in graphPackages:
+        if pkg not in existingPackages:
+            missedPackages.add(pkg)
+    return len(missedPackages) == 0
 
 
 def findPinClassByType(dataType):

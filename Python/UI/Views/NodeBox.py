@@ -215,12 +215,12 @@ class NodeBoxTreeWidget(QtWidgets.QTreeWidget):
             self.canvas.hideNodeBox()
             pressedPin = self.canvas.pressedPin
             if pressedPin.direction == PinDirection.Input:
-                for pin in node.UIoutputs.values():
+                for pin in node.ui_outputs.values():
                     wire = self.canvas.connectPinsInternal(pressedPin, pin)
                     if wire is not None:
                         break
             if pressedPin.direction == PinDirection.Output:
-                for pin in node.UIinputs.values():
+                for pin in node.ui_inputs.values():
                     wire = self.canvas.connectPinsInternal(pin, pressedPin)
                     if wire is not None:
                         break

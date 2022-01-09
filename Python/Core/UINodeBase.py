@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from PySide2 import QtCore, QtWidgets, QtGui, QtSvg
-from Python.Core.UICommon import NodeDefaults, rst2html
+from Python.Core.UICommon import NodeDefaults, rst2html, Spacings
 from Python.UI.Utils.stylesheet import Colors
 from Python.UI.Canvas.Painters import NodePainter
 from Python.Core.Common import PinDirection
@@ -55,8 +55,8 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         self.head_color = NodeDefaults().DEFAULT_NODE_HEAD_COLOR
         self._w = 0
         self.h = 30
-        self.minWidth = 50
-        self.minHeight = self.h
+        self.min_width = 50
+        self.min_height = self.h
 
         # Font Options
         self.nodeNameFont = QtGui.QFont("Consolas")
@@ -131,11 +131,11 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         self._menu = QtWidgets.QMenu()
 
         # Hiding/Moving By Group/collapse/By Pin
-        self._rect = QtCore.QRectF(0, 0, self.minWidth, self.minHeight)
+        self._rect = QtCore.QRectF(0, 0, self.min_width, self.min_height)
 
         # Resizing Options
-        self.initialRectWidth = self.minWidth
-        self.initialRectHeight = self.minHeight
+        self.initialRectWidth = self.min_width
+        self.initialRectHeight = self.min_height
         self._collapsed = False
         self.resizable = False
         self.bResize = False
@@ -214,15 +214,14 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
     @property
     def label_width(self):
         header_width = self.nodeNameWidget.sizeHint(None, None).width()
-        header_width += self.buttonsWidth()
-        return max(header_width, self.minWidth)
+        return max(header_width, self.min_width)
 
     @property
     def namePinOutputsMap(self):
         result = OrderedDict()
         for raw_pin in self._raw_node.pins:
             if raw_pin.direction == PinDirection.Output:
-                wrapper = raw_pin.getWrapper()
+                wrapper = raw_pin.get_ui()
                 if wrapper is not None:
                     result[raw_pin.name] = wrapper()
         return result
@@ -232,10 +231,37 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         result = OrderedDict()
         for raw_pin in self._raw_node.pins:
             if raw_pin.direction == PinDirection.Input:
-                result[raw_pin.name] = raw_pin.getWrapper()()
+                result[raw_pin.name] = raw_pin.get_ui()()
         return result
 
-#===============callbacks ===================
+    @property
+    def UIPins(self):
+        result = OrderedDict()
+        for raw_pin in self._raw_node.pins:
+            uiPinRef = raw_pin.get_ui()
+            if uiPinRef is not None:
+                result[raw_pin.uid] = uiPinRef()
+        return result
+
+    @property
+    def ui_inputs(self):
+        result = OrderedDict()
+        for raw_pin in self._raw_node.ordered_inputs.values():
+            wrapper = raw_pin.get_ui()
+            if wrapper is not None:
+                result[raw_pin.uid] = wrapper()
+        return result
+
+    @property
+    def ui_outputs(self):
+        result = OrderedDict()
+        for raw_pin in self._raw_node.ordered_outputs.values():
+            wrapper = raw_pin.get_ui()
+            if wrapper is not None:
+                result[raw_pin.uid] = wrapper()
+        return result
+
+    #===============callbacks ===================
 
     def kill(self, *args, **kwargs):
         scene = self.scene()
@@ -256,7 +282,12 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         self.dirty = True
         self.update()
 
-    #================================
+    #=================overriding parent method===============
+
+    def sizeHint(self, which, constraint):
+        return QtCore.QSizeF(self.get_node_width(), self.get_node_height())
+
+    #==================================
 
     def description(self):
         return self._raw_node.description()
@@ -299,14 +330,14 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         name = raw_pin.name
         lblName = name
         if raw_pin.direction == PinDirection.Input:
-            insertionIndex = -1
-            self.inputsLayout.insertItem(insertionIndex, p)
+            insertion_index = -1
+            self.inputsLayout.insertItem(insertion_index, p)
             self.inputsLayout.setAlignment(p, QtCore.Qt.AlignLeft)
             self.inputsLayout.invalidate()
 
         elif raw_pin.direction == PinDirection.Output:
-            insertionIndex = -1
-            self.outputsLayout.insertItem(insertionIndex, p)
+            insertion_index = -1
+            self.outputsLayout.insertItem(insertion_index, p)
             self.outputsLayout.setAlignment(p, QtCore.Qt.AlignRight)
             self.outputsLayout.invalidate()
 
@@ -314,18 +345,99 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
 
         self.update()
         self.update_node_shape()
-        p.syncDynamic()
-        p.syncRenamable()
+        # p.syncDynamic()
+        # p.syncRenamable()
         if self.collapsed:
             p.hide()
         return p
 
-    def getNodeWidth(self):
-        width = self.getPinsWidth() + self.pinsLayout.spacing() * 2
+    def get_pins_width(self):
+        iwidth = 0
+        owidth = 0
+        pinwidth = 0
+        pinwidth2 = 0
+        for i in self.UIPins.values():
+            if i.direction == PinDirection.Input:
+                iwidth = max(iwidth, i.sizeHint(None, None).width())
+            else:
+                owidth = max(owidth, i.sizeHint(None, None).width())
+        for igrp in self.groups["input"].values():
+            w = igrp.geometry().width()
+            iwidth = max(iwidth, w)
+        for ogrp in self.groups["output"].values():
+            w = ogrp.geometry().width()
+            owidth = max(owidth, w)
+        return iwidth + owidth + pinwidth + pinwidth2 + Spacings.kPinOffset
+
+    def buttonsWidth(self):
+        # actions width. 10 is svg icon size, probably need to move this value to some preferences
+        try:
+            headerWidth = 0
+            numActions = len(self._actionButtons)
+            headerWidth += numActions * 10
+            headerWidth += self.headerLayout.spacing() * 2 + NodeDefaults().CONTENT_MARGINS * 2
+            return headerWidth
+        except:
+            return 0
+
+    def get_node_width(self):
+        width = self.get_pins_width() + self.pinsLayout.spacing() * 2
         if self.resizable:
             width = max(self._rect.width(), width)
         width = max(width, self.label_width)
         return width
+
+    def get_node_height(self):
+        h = self.nodeNameWidget.sizeHint(None, None).height()
+        h += self.nodeLayout.spacing()
+        try:
+            numInputs = len(self.ui_inputs)
+            numOutputs = len(self.ui_outputs)
+            ipins = self.ui_inputs.values()
+            opins = self.ui_outputs.values()
+            h += NodeDefaults().CONTENT_MARGINS * 2
+
+            iPinsHeight = 0
+            for pin in ipins:
+                if pin.isVisible():
+                    iPinsHeight += pin.sizeHint(None, None).height() + NodeDefaults().LAYOUTS_SPACING
+            oPinsHeight = 0
+            for pin in opins:
+                if pin.isVisible():
+                    oPinsHeight += pin.sizeHint(None, None).height() + NodeDefaults().LAYOUTS_SPACING
+
+            h += max(iPinsHeight, oPinsHeight)
+
+            igrhHeight = 0
+            ogrhHeight = 0
+            for grp in self.groups["input"].values():
+                igrhHeight += grp.sizeHint(None, None).height() + NodeDefaults().LAYOUTS_SPACING
+            for grp in self.groups["output"].values():
+                ogrhHeight += grp.sizeHint(None, None).height() + NodeDefaults().LAYOUTS_SPACING
+            h += max(igrhHeight, ogrhHeight)
+
+        except Exception as e:
+            print(e)
+            pass
+        custCount = 0
+        for cust in range(0, self.customLayout.count()):
+            out = self.customLayout.itemAt(cust)
+            if out.isVisible():
+                h += out.minimumHeight()
+                custCount += 1
+        if custCount > 0:
+            h += self.customLayout.spacing() * self.customLayout.count()
+
+        if h < self.min_height:
+            h = self.min_height
+
+        if self.resizable:
+            h = max(self._rect.height(), h)
+
+        if self.collapsed:
+            h = min(self.min_height, self.labelHeight + self.nodeLayout.spacing() * 2)
+
+        return h
 
     def finalize_rename(self, accepted=False):
         """Called by :class:`~PyFlow.UI.Canvas.UINodeBase.NodeName`
@@ -340,7 +452,7 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
             name = self.nodeNameWidget.getPlainText()
             if self.isNameValidationEnabled():
                 name = name.replace(" ", "")
-            new_name = self.canvasRef().graphManager.get_uniq_node_name(name)
+            new_name = self.canvasRef().graph_manager.get_uniq_node_name(name)
             self.name = new_name
             self.setHeaderHtml(new_name)
 
@@ -369,9 +481,9 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
             self.canvasRef().update()
         self.nodeNameWidget.updateGeometry()
         self.nodeNameWidget.update()
-        self.pinsLayout.setPreferredWidth(self.getNodeWidth() - self.nodeLayout.spacing())
-        self.headerLayout.setPreferredWidth(self.getNodeWidth() - self.nodeLayout.spacing())
-        self.customLayout.setPreferredWidth(self.getNodeWidth() - self.nodeLayout.spacing())
+        self.pinsLayout.setPreferredWidth(self.get_node_width() - self.nodeLayout.spacing())
+        self.headerLayout.setPreferredWidth(self.get_node_width() - self.nodeLayout.spacing())
+        self.customLayout.setPreferredWidth(self.get_node_width() - self.nodeLayout.spacing())
 
     def invalidateNodeLayouts(self):
         self.inputsLayout.invalidate()
@@ -384,7 +496,6 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
 
     def post_create(self, json_template=None):
         self.update_node_header_color()
-
         # create ui pin wrappers
         for i in self._raw_node.get_ordered_pins():
             self._create_UI_pin_wrapper(i)
@@ -396,19 +507,17 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
             print("graph doesn't exist for node: %s" % self._raw_node.name)
         assert(self._raw_node.graph() is not None), "NODE GRAPH IS NONE"
         if self.canvasRef is not None:
-            if self.canvasRef().graphManager.active_graph() != self._raw_node.graph():
+            if self.canvasRef().graph_manager.active_graph() != self._raw_node.graph():
                 self.hide()
 
         if not self.draw_label:
             self.nodeNameWidget.hide()
 
-        self.createActionButtons()
-
-        if json_template is not None and json_template["wrapper"] is not None:
-            if "exposeInputsToCompound" in json_template["wrapper"]:
-                self.setExposePropertiesToCompound(json_template["wrapper"]["exposeInputsToCompound"])
-            if "collapsed" in json_template["wrapper"]:
-                self.collapsed = json_template["wrapper"]["collapsed"]
+        if json_template is not None and json_template["ui"] is not None:
+            if "exposeInputsToCompound" in json_template["ui"]:
+                self.setExposePropertiesToCompound(json_template["ui"]["exposeInputsToCompound"])
+            if "collapsed" in json_template["ui"]:
+                self.collapsed = json_template["ui"]["collapsed"]
             if "groups" in json_template["ui"]:
                 try:
                     for group_name, expanded in json_template["ui"]["groups"]["input"].items():
@@ -420,9 +529,9 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
 
         description = self.description()
         if description:
-            self.setToolTip("%s\nComputingTime: %s"%(rst2html(self.description()),self._raw_node._computingTime))
+            self.setToolTip(rst2html(self.description()))
         else:
-            self.setToolTip("\nComputingTime: %s"%self._raw_node._computingTime)
+            self.setToolTip("empty description")
 
     def paint(self, painter, option, widget):
         NodePainter.default(self, painter, option, widget)
@@ -498,7 +607,7 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
                 posdelta = self.mapToScene(event.pos()) - self.origPos
                 posdelta2 = self.mapToScene(event.pos()) - self.initPos
                 newWidth = -posdelta2.x() + self.initialRectWidth
-                if newWidth > self.minWidth:
+                if newWidth > self.min_width:
                     self.translate(posdelta.x(), 0)
                     self.origPos = self.pos()
                     self._rect.setWidth(newWidth)
@@ -507,40 +616,40 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
                 posdelta = self.mapToScene(event.pos()) - self.origPos
                 posdelta2 = self.mapToScene(event.pos()) - self.initPos
                 minHeight = -posdelta2.y() + self.initialRectHeight
-                if minHeight > self.minHeight:
+                if minHeight > self.min_height:
                     self.translate(0, posdelta.y())
                     self.origPos = self.pos()
                     self._rect.setHeight(minHeight)
                     self.updateNodeShape()
             elif self.resizeDirection == (1, 0):  # right
                 newWidth = delta.x() + self.initialRectWidth
-                if newWidth > self.minWidth:
+                if newWidth > self.min_width:
                     self._rect.setWidth(newWidth)
                     self.w = newWidth
                     self.updateNodeShape()
             elif self.resizeDirection == (0, 1):    # bottom
                 newHeight = delta.y() + self.initialRectHeight
-                if newHeight > self.minHeight:
+                if newHeight > self.min_height:
                     self._rect.setHeight(newHeight)
                     self.updateNodeShape()
             elif self.resizeDirection == (1, 1):    # bottom right
                 newWidth = delta.x() + self.initialRectWidth
                 newHeight = delta.y() + self.initialRectHeight
-                if newWidth > self.minWidth:
+                if newWidth > self.min_width:
                     self._rect.setWidth(newWidth)
                     self.w = newWidth
                     self.updateNodeShape()
-                if newHeight > self.minHeight:
+                if newHeight > self.min_height:
                     self._rect.setHeight(newHeight)
                     self.updateNodeShape()
             elif self.resizeDirection == (-1, 1):    # bottom left
                 newHeight = delta.y() + self.initialRectHeight
-                if newHeight > self.minHeight:
+                if newHeight > self.min_height:
                     self._rect.setHeight(newHeight)
                 posdelta = self.mapToScene(event.pos()) - self.origPos
                 posdelta2 = self.mapToScene(event.pos()) - self.initPos
                 newWidth = -posdelta2.x() + self.initialRectWidth
-                if newWidth > self.minWidth:
+                if newWidth > self.min_width:
                     self.translate(posdelta.x(), 0)
                     self.origPos = self.pos()
                     self._rect.setWidth(newWidth)
@@ -549,12 +658,12 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
                 posdelta = self.mapToScene(event.pos()) - self.origPos
                 posdelta2 = self.mapToScene(event.pos()) - self.initPos
                 minHeight = -posdelta2.y() + self.initialRectHeight
-                if minHeight > self.minHeight:
+                if minHeight > self.min_height:
                     self.translate(0, posdelta.y())
                     self.origPos = self.pos()
                     self._rect.setHeight(minHeight)
                 newWidth = -posdelta2.x() + self.initialRectWidth
-                if newWidth > self.minWidth:
+                if newWidth > self.min_width:
                     self.translate(posdelta.x(), 0)
                     self.origPos = self.pos()
                     self._rect.setWidth(newWidth)
@@ -563,12 +672,12 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
                 posdelta = self.mapToScene(event.pos()) - self.origPos
                 posdelta2 = self.mapToScene(event.pos()) - self.initPos
                 minHeight = -posdelta2.y() + self.initialRectHeight
-                if minHeight > self.minHeight:
+                if minHeight > self.min_height:
                     self.translate(0, posdelta.y())
                     self.origPos = self.pos()
                     self._rect.setHeight(minHeight)
                 newWidth = delta.x() + self.initialRectWidth
-                if newWidth > self.minWidth:
+                if newWidth > self.min_width:
                     self._rect.setWidth(newWidth)
                     self.w = newWidth
                 self.updateNodeShape()
