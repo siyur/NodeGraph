@@ -2,6 +2,8 @@ import weakref
 from PySide2 import QtCore, QtWidgets, QtGui
 from Python.Core.Common import PinDirection
 
+from PyFlow.UI.Canvas.Painters import PinPainter
+
 UI_PINS_FACTORIES = {}
 
 
@@ -78,3 +80,11 @@ class UIPinBase(QtWidgets.QGraphicsItem):
                 result = self.mapFromItem(self.owningNode(), QtCore.QPointF(
                     self.owningNode().sizeHint(None, None).width(), label_height))
         return result
+
+    def paint(self, painter, option, widget):
+        if self.isArray():
+            PinPainter.asArrayPin(self, painter, option, widget)
+        elif self.isDict():
+            PinPainter.asDictPin(self, painter, option, widget)
+        else:
+            PinPainter.asValuePin(self, painter, option, widget)
