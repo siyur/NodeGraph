@@ -158,7 +158,7 @@ class NodePainter(object):
             pen.setWidth(prevWidth * 2)
             paint = True
         else:
-            if node._rawNode.isDirty():
+            if node._raw_node.isDirty():
                 pen.setColor(Colors.Orange)
                 pen.setStyle(node.optPenSelectedType)
                 pen.setWidth(prevWidth * 2)
@@ -169,7 +169,7 @@ class NodePainter(object):
                 pen.setWidth(prevWidth * 2)
                 paint = True
 
-        if paint and node.isValid():
+        if paint and node.is_valid():
             painter.setPen(pen)
             painter.setBrush(QtGui.QColor(0, 0, 0, 0))
             rect = QtCore.QRectF(r)

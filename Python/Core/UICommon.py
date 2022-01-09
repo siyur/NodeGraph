@@ -1,4 +1,5 @@
 import uuid
+from docutils import core
 from nine import IS_PYTHON2, str
 if IS_PYTHON2:
     from aenum import IntEnum
@@ -110,3 +111,8 @@ def findPinClassByType(dataType):
         if dataType in pins:
             return pins[dataType]
     return None
+
+def rst2html(rst):
+    if rst is not None:
+        return core.publish_string(rst, writer_name="html").decode("utf-8")
+    return ""

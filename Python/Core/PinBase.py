@@ -9,6 +9,7 @@ from Python.Core.Common import \
     disconnectPins, \
     getConnectedPins
 
+
 class PinBase(IPin):
     """
     **Base class for pins**
@@ -29,6 +30,10 @@ class PinBase(IPin):
         self.killed = Signal()
         self.onExecute = Signal(object)
         self.markedAsDirty = Signal()
+
+        self.errorOccured = Signal(object)
+        self.errorCleared = Signal()
+        self._last_error = None
 
         # Access to the node
         self.owning_node = weakref.ref(owning_node)
@@ -158,6 +163,22 @@ class PinBase(IPin):
         """
         return self.ui
 
+    def clear_error(self):
+        """Clears any last error on this pin and fires event
+        """
+        if self._last_error is not None:
+            self._last_error = None
+            self.errorCleared.send()
+
+    def set_error(self, err):
+        """Marks this pin as invalid by setting error message to it. Also fires event
+
+        :param err: Error message
+        :type err: str
+        """
+        self._last_error = str(err)
+        self.errorOccured.send(self._last_error)
+
     def setDirty(self):
         """Sets dirty flag to True
         """
@@ -202,7 +223,7 @@ class PinBase(IPin):
             self.owning_node().pinsCreationOrder.pop(self.uid)
 
     def call(self, *args, **kwargs):
-        if self.owning_node().isValid():
+        if self.owning_node().is_valid():
             self.onExecute.send(*args, **kwargs)
 
     def serialize(self):

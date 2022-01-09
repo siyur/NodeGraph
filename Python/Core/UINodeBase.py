@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from PySide2 import QtCore, QtWidgets, QtGui, QtSvg
-from Python.Core.UICommon import NodeDefaults
+from Python.Core.UICommon import NodeDefaults, rst2html
 from Python.UI.Utils.stylesheet import Colors
 from Python.UI.Canvas.Painters import NodePainter
 from Python.Core.Common import PinDirection
@@ -29,6 +29,13 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
 
     def __init__(self, raw_node, color=Colors.NodeBackgrounds, head_color_override=None):
         super(UINodeBase, self).__init__()
+        self.setFlag(QtWidgets.QGraphicsWidget.ItemIsMovable)
+        self.setFlag(QtWidgets.QGraphicsWidget.ItemIsFocusable)
+        self.setFlag(QtWidgets.QGraphicsWidget.ItemIsSelectable)
+        self.setFlag(QtWidgets.QGraphicsWidget.ItemSendsGeometryChanges)
+        self.setCacheMode(QtWidgets.QGraphicsItem.DeviceCoordinateCache)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        self.setAcceptHoverEvents(True)
 
         # Raw Node Definition
         self.dirty = True
@@ -254,6 +261,9 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
     def description(self):
         return self._raw_node.description()
 
+    def is_valid(self):
+        return self._raw_node.is_valid()
+
     def update_node_header_color(self):
         if self.head_color_override is None:
             self.head_color = NodeDefaults().DEFAULT_NODE_HEAD_COLOR
@@ -410,7 +420,7 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
 
         description = self.description()
         if description:
-            self.setToolTip("%s\nComputingTime: %s"%(str(self.description()),self._raw_node._computingTime))
+            self.setToolTip("%s\nComputingTime: %s"%(rst2html(self.description()),self._raw_node._computingTime))
         else:
             self.setToolTip("\nComputingTime: %s"%self._raw_node._computingTime)
 
@@ -569,6 +579,13 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         self.resetResizeStrips()
         self.update()
         super(UINodeBase, self).mouseReleaseEvent(event)
+
+    def hoverEnterEvent(self, event):
+        super(UINodeBase, self).hoverEnterEvent(event)
+        if not self.is_valid():
+            self.setToolTip(self.get_last_error_message())
+        else:
+            self.setToolTip("%s\nComputingTime: %s"%(rst2html(self.description()),self._raw_node._computingTime))
 
     def shutDown(self):
         pass

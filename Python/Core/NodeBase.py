@@ -48,7 +48,9 @@ class NodeBase(INode):
         self.x = 0.0
         self.y = 0.0
 
-        self.data = "empty"
+        self._last_error = None
+        self.errorOccured = Signal(object)
+        self.errorCleared = Signal()
 
         # Flags
         self._flags = PinOptions.Storable
@@ -128,12 +130,39 @@ class NodeBase(INode):
         return template
 
     @staticmethod
-    def pinTypeHints():
+    def pin_type_hints():
         return NodePinsSuggestionsHelper()
 
     @staticmethod
     def description():
         return "Default node description"
+
+    def is_valid(self):
+        return self._last_error is None
+
+    def get_last_error_message(self):
+        return self._last_error
+
+    def clear_error(self):
+        self._last_error = None
+        self.errorCleared.send()
+
+    def setError(self, err):
+        self._last_error = str(err)
+        self.errorOccured.send(self._last_error)
+
+    def checkForErrors(self):
+        failed_pins = {}
+        for pin in self._pins:
+            if pin._last_error is not None:
+                failed_pins[pin.name] = pin._last_error
+        if len(failed_pins):
+            self._last_error = "Error on Pins:%s" % str(failed_pins)
+        else:
+            self.clear_error()
+        ui = self.get_ui()
+        if ui:
+            ui.update()
 
     def get_ordered_pins(self):
         return self.pinsCreationOrder.values()
@@ -185,9 +214,6 @@ class NodeBase(INode):
         """
         self.x = x
         self.y = y
-
-    def set_data(self, data):
-        self.data = data
 
     def get_name(self):
         return self.name
