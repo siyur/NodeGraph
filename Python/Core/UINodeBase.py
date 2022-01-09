@@ -585,7 +585,7 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
         if not self.is_valid():
             self.setToolTip(self.get_last_error_message())
         else:
-            self.setToolTip("%s\nComputingTime: %s"%(rst2html(self.description()),self._raw_node._computingTime))
+            self.setToolTip(rst2html(self.description()))
 
     def shutDown(self):
         pass
