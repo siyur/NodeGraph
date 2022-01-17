@@ -58,7 +58,7 @@ class NodeBase(INode):
 
         # gui class weak ref
         self.ui = None
-        self.__ui_Json_data = None
+        self.__ui_json_data = None
 
     @property
     def package_name(self):
@@ -147,7 +147,7 @@ class NodeBase(INode):
         self._last_error = None
         self.errorCleared.send()
 
-    def setError(self, err):
+    def set_error(self, err):
         self._last_error = str(err)
         self.errorOccured.send(self._last_error)
 
@@ -294,7 +294,7 @@ class NodeBase(INode):
             self.x = json_template['x']
             self.y = json_template['y']
 
-            self.__ui_Json_data = None
+            self.__ui_json_data = None
 
             # set pins data
             sorted_inputs = sorted(json_template['inputs'], key=lambda pin_dict: pin_dict["pinIndex"])
@@ -309,7 +309,7 @@ class NodeBase(INode):
 
             # store data for wrapper
             if 'ui' in json_template:
-                self.__ui_Json_data = json_template['ui']
+                self.__ui_json_data = json_template['ui']
 
         self.checkForErrors()
 

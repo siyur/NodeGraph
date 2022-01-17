@@ -4,6 +4,7 @@ import weakref
 from functools import partial
 from PySide2 import QtWidgets, QtCore, QtGui
 from Python.UI.Canvas.CanvasBase import CanvasBase
+from Python.UI.Utils.stylesheet import Colors
 from Python.UI.Canvas.SelectionRect import SelectionRect
 from Python.UI.Views.NodeBox import NodesBox
 from Python.UI.Canvas.AutoPanController import AutoPanController
@@ -12,7 +13,13 @@ from Python.Core.UIPinBase import UIPinBase
 from Python.Core.UINodeBase import UINodeBase, getUINodeInstance
 from Python.Core.NodeBase import NodeBase
 from Python.Core.PinBase import PinBase
-from Python.Core.Common import PinDirection, PinSelectionGroup, canConnectPins, cycleCheck
+from Python.Core.Common import \
+    PinDirection, \
+    PinSelectionGroup, \
+    canConnectPins, \
+    cycleCheck, \
+    connectPins, \
+    disconnectPins
 from Python.Core.UICommon import CanvasManipulationMode
 from Python.Core.UIConnection import UIConnection
 
@@ -25,6 +32,10 @@ class BlueprintCanvas(CanvasBase):
     UI canvas class
     """
 
+    _realTimeLineInvalidColor = Colors.Red
+    _realTimeLineNormalColor = Colors.White
+    _realTimeLineValidColor = Colors.Green
+
     def __init__(self, graph_manager, app_instance=None):
         super(BlueprintCanvas, self).__init__()
 
@@ -36,12 +47,22 @@ class BlueprintCanvas(CanvasBase):
         self.app_instance = app_instance
 
         self.pressedPin = None
-        self._selectionRect = None
-
+        self.releasedPin = None
         self.resizing = False
 
         self.autoPanController = AutoPanController()
 
+        self.hoveredReroutes = []
+
+        # realtime pin connection line
+        self.realTimeLine = QtWidgets.QGraphicsPathItem(None, self.scene())
+        self.realTimeLine.name = 'RealTimeLine'
+        self.realTimeLineInvalidPen = QtGui.QPen(self._realTimeLineInvalidColor, 2.0, QtCore.Qt.SolidLine)
+        self.realTimeLineNormalPen = QtGui.QPen(self._realTimeLineNormalColor, 2.0, QtCore.Qt.DashLine)
+        self.realTimeLineValidPen = QtGui.QPen(self._realTimeLineValidColor, 2.0, QtCore.Qt.SolidLine)
+        self.realTimeLine.setPen(self.realTimeLineNormalPen)
+
+        # node box
         self.node_box = NodesBox(self.getApp(), self, bUseDragAndDrop=True)
         self.node_box.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.FramelessWindowHint)
         self._drawRealtimeLine = False
@@ -218,6 +239,77 @@ class BlueprintCanvas(CanvasBase):
             parentGraph.add_node(ui_node._raw_node, jsonTemplate)
         ui_node.post_create(jsonTemplate)
 
+    def updateReroutes(self, event, showPins=False):
+        tolerance = 9 * self.currentViewScale()
+        mouseRect = QtCore.QRect(QtCore.QPoint(event.pos().x() - tolerance, event.pos().y() - tolerance),
+                                 QtCore.QPoint(event.pos().x() + tolerance, event.pos().y() + tolerance))
+        hoverItems = self.items(mouseRect)
+        self.hoveredReroutes += [node for node in hoverItems if isinstance(node, UINodeBase) and node.isReroute()]
+        for node in self.hoveredReroutes:
+            if showPins:
+                if node in hoverItems:
+                    node.showPins()
+                else:
+                    node.hidePins()
+                    self.hoveredReroutes.remove(node)
+            else:
+                node.hidePins()
+                self.hoveredReroutes.remove(node)
+
+    def create_ui_connection_for_connected_pins(self, srcUiPin, dstUiPin):
+        assert(srcUiPin is not None)
+        assert(dstUiPin is not None)
+        if srcUiPin.direction == PinDirection.Input:
+            srcUiPin, dstUiPin = dstUiPin, srcUiPin
+        uiConnection = UIConnection(srcUiPin, dstUiPin, self)
+        self.scene().addItem(uiConnection)
+        self.connections[uiConnection.uid] = uiConnection
+        # restore wire data
+        pinWrapperData = srcUiPin.ui_json_data
+        if pinWrapperData is not None:
+            if "wires" in pinWrapperData:
+                wiresData = pinWrapperData["wires"]
+                key = str(dstUiPin.pinIndex)
+                if str(dstUiPin.pinIndex) in wiresData:
+                    uiConnection.applyJsonData(wiresData[key])
+        return uiConnection
+
+    def connect_pins_internal(self, src, dst):
+        result = connectPins(src._raw_pin, dst._raw_pin)
+        if result:
+            return self.create_ui_connection_for_connected_pins(src, dst)
+        return None
+
+    def connect_pins(self, src, dst):
+        # Highest level connect pins function
+        pass
+        # if src and dst:
+        #     if canConnectPins(src._raw_pin, dst._raw_pin):
+        #         wire = self.connect_pins_internal(src, dst)
+        #         if wire is not None:
+        #             EditorHistory().saveState("Connect pins", modify=True)
+
+    def remove_item_by_name(self, name):
+        for i in self.scene().items():
+            if hasattr(i, 'name') and i.name == name:
+                self.scene().removeItem(i)
+
+    def removeConnection(self, connection):
+        src = connection.source()._raw_pin
+        dst = connection.destination()._raw_pin
+        # this will remove raw pins from affection lists
+        # will call pinDisconnected for raw pins
+        disconnectPins(src, dst)
+
+        # call disconnection events for ui pins
+        connection.source().pin_disconnected(connection.destination())
+        connection.destination().pin_disconnected(connection.source())
+        self.connections.pop(connection.uid)
+        connection.source().uiConnectionList.remove(connection)
+        connection.destination().uiConnectionList.remove(connection)
+        connection.prepareGeometryChange()
+        self.scene().removeItem(connection)
+
     def mousePressEvent(self, event):
         # TODO: Move navigation part to base class
         self.pressed_item = self.itemAt(event.pos())
@@ -345,11 +437,11 @@ class BlueprintCanvas(CanvasBase):
                     if wire.destinationPositionOverride is not None:
                         lhsPin = wire.source()
                         self.removeConnection(wire)
-                        self.connectPinsInternal(lhsPin, self.releasedPin)
+                        self.connect_pins_internal(lhsPin, self.releasedPin)
                     elif wire.sourcePositionOverride is not None:
                         rhsPin = wire.destination()
                         self.removeConnection(wire)
-                        self.connectPinsInternal(self.releasedPin, rhsPin)
+                        self.connect_pins_internal(self.releasedPin, rhsPin)
             else:
                 for wire in self.reconnectingWires:
                     self.removeConnection(wire)
@@ -362,7 +454,7 @@ class BlueprintCanvas(CanvasBase):
         if self._drawRealtimeLine:
             self._drawRealtimeLine = False
             if self.realTimeLine in self.scene().items():
-                self.removeItemByName('RealTimeLine')
+                self.remove_item_by_name('RealTimeLine')
 
         if self.manipulationMode == CanvasManipulationMode.SELECT:
             self._selectionRect.destroy()
@@ -380,7 +472,7 @@ class BlueprintCanvas(CanvasBase):
         elif event.button() == QtCore.Qt.LeftButton and self.releasedPin is None:
             if isinstance(self.pressed_item, UIPinBase) and not self.resizing and modifiers == QtCore.Qt.NoModifier:
                 # suggest nodes that can be connected to pressed pin
-                self.showNodeBox(self.pressed_item.direction, self.pressed_item._rawPin.getCurrentStructure())
+                self.showNodeBox(self.pressed_item.direction)
         self.manipulationMode = CanvasManipulationMode.NONE
         if not self.resizing:
             p_itm = self.pressedPin
@@ -401,7 +493,7 @@ class BlueprintCanvas(CanvasBase):
 
             if do_connect:
                 if p_itm is not r_itm:
-                    self.connectPins(p_itm, r_itm)
+                    self.connect_pins(p_itm, r_itm)
 
         # We don't want properties view go crazy
         # check if same node pressed and released left mouse button and not moved
@@ -412,8 +504,11 @@ class BlueprintCanvas(CanvasBase):
             pass
             # check if clicking on node action button
             # if self.released_item is not None:
+            #     if isinstance(self.released_item.parentItem(), NodeActionButtonBase):
+            #         return
             #     self.tryFillPropertiesView(pressedNode)
         self.resizing = False
+        self.updateReroutes(event, False)
 
     def mouseMoveEvent(self, event):
         # TODO: Move navigation part to base class
@@ -458,7 +553,7 @@ class BlueprintCanvas(CanvasBase):
             if len(hoveredPins) > 0:
                 item = hoveredPins[0]
                 if isinstance(item, UIPinBase) and isinstance(self.pressed_item, UIPinBase):
-                    canBeConnected = canConnectPins(self.pressed_item._rawPin, item._rawPin)
+                    canBeConnected = canConnectPins(self.pressed_item._raw_pin, item._raw_pin)
                     self.realTimeLine.setPen(self.realTimeLineValidPen if canBeConnected else self.realTimeLineInvalidPen)
                     if canBeConnected:
                         p2 = item.scenePos() + item.pinCenter()
@@ -475,17 +570,17 @@ class BlueprintCanvas(CanvasBase):
             if modifiers == QtCore.Qt.AltModifier:
                 self._drawRealtimeLine = False
                 if self.realTimeLine in self.scene().items():
-                    self.removeItemByName('RealTimeLine')
+                    self.remove_item_by_name('RealTimeLine')
                 rerouteNode = self.getRerouteNode(event.pos())
                 self.clearSelection()
                 rerouteNode.setSelected(True)
                 for inp in rerouteNode.ui_inputs.values():
-                    if canConnectPins(self.pressed_item._rawPin, inp._rawPin):
-                        self.connectPins(self.pressed_item, inp)
+                    if canConnectPins(self.pressed_item._raw_pin, inp._raw_pin):
+                        self.connect_pins(self.pressed_item, inp)
                         break
                 for out in rerouteNode.ui_outputs.values():
-                    if canConnectPins(self.pressed_item._rawPin, out._rawPin):
-                        self.connectPins(self.pressed_item, out)
+                    if canConnectPins(self.pressed_item._raw_pin, out._raw_pin):
+                        self.connect_pins(self.pressed_item, out)
                         break
                 self.pressed_item = rerouteNode
                 self.manipulationMode = CanvasManipulationMode.MOVE
@@ -590,9 +685,9 @@ class BlueprintCanvas(CanvasBase):
                             if item.destination() == list(node.ui_outputs.values())[0].connections[0].destination():
                                 newIns.append([item.source(), item.drawSource])
                 for out in newOuts:
-                    self.connectPins(list(node.ui_outputs.values())[0], out[0])
+                    self.connect_pins(list(node.ui_outputs.values())[0], out[0])
                 for inp in newIns:
-                    self.connectPins(inp[0], list(node.ui_inputs.values())[0])
+                    self.connect_pins(inp[0], list(node.ui_inputs.values())[0])
         elif self.manipulationMode == CanvasManipulationMode.PAN:
             self.pan(mouseDelta)
         elif self.manipulationMode == CanvasManipulationMode.ZOOM:
@@ -703,10 +798,10 @@ class BlueprintCanvas(CanvasBase):
                     if isinstance(item, UIConnection):
                         valid = False
                         for inp in self.tempnode.ui_inputs.values():
-                            if canConnectPins(item.source()._rawPin, inp._rawPin):
+                            if canConnectPins(item.source()._raw_pin, inp._raw_pin):
                                 valid = True
                         for out in self.tempnode.ui_outputs.values():
-                            if canConnectPins(out._rawPin, item.destination()._rawPin):
+                            if canConnectPins(out._raw_pin, item.destination()._raw_pin):
                                 valid = True
                         if valid:
                             self.hoverItems.append(item)
@@ -782,27 +877,27 @@ class BlueprintCanvas(CanvasBase):
                 if isinstance(dropItem, UIPinBase):
                     node.setPos(x - node.boundingRect().width(), y)
                     for inp in nodeInputs.values():
-                        if canConnectPins(dropItem._rawPin, inp._rawPin):
+                        if canConnectPins(dropItem._raw_pin, inp._raw_pin):
                             if dropItem.isExec():
-                                dropItem._rawPin.disconnectAll()
-                            self.connectPins(dropItem, inp)
+                                dropItem._raw_pin.disconnectAll()
+                            self.connect_pins(dropItem, inp)
                             node.setPos(x + node.boundingRect().width(), y)
                             break
                     for out in nodeOutputs.values():
-                        if canConnectPins(out._rawPin, dropItem._rawPin):
-                            self.connectPins(out, dropItem)
+                        if canConnectPins(out._raw_pin, dropItem._raw_pin):
+                            self.connect_pins(out, dropItem)
                             node.setPos(x - node.boundingRect().width(), y)
                             break
                 elif isinstance(dropItem, UIConnection):
                     for inp in nodeInputs.values():
-                        if canConnectPins(dropItem.source()._rawPin, inp._rawPin):
+                        if canConnectPins(dropItem.source()._raw_pin, inp._raw_pin):
                             if dropItem.source().isExec():
-                                dropItem.source()._rawPin.disconnectAll()
-                            self.connectPins(dropItem.source(), inp)
+                                dropItem.source()._raw_pin.disconnectAll()
+                            self.connect_pins(dropItem.source(), inp)
                             break
                     for out in nodeOutputs.values():
-                        if canConnectPins(out._rawPin, dropItem.destination()._rawPin):
-                            self.connectPins(out, dropItem.destination())
+                        if canConnectPins(out._raw_pin, dropItem.destination()._raw_pin):
+                            self.connect_pins(out, dropItem.destination())
                             break
                 elif not dropItem:
                     self.hideNodeBox()

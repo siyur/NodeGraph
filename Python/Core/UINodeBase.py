@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from PySide2 import QtCore, QtWidgets, QtGui, QtSvg
 from Python.Core.UICommon import NodeDefaults, rst2html, Spacings
+from Python.UI.UIInterfaces import IUINode
 from Python.UI.Utils.stylesheet import Colors
 from Python.UI.Canvas.Painters import NodePainter
 from Python.Core.Common import PinDirection
@@ -24,7 +25,7 @@ def REGISTER_UI_NODE_FACTORY(package_name, factory):
         UI_NODES_FACTORIES[package_name] = factory
 
 
-class UINodeBase(QtWidgets.QGraphicsWidget):
+class UINodeBase(QtWidgets.QGraphicsWidget, IUINode):
     draw_label = None
 
     def __init__(self, raw_node, color=Colors.NodeBackgrounds, head_color_override=None):
@@ -455,6 +456,9 @@ class UINodeBase(QtWidgets.QGraphicsWidget):
             new_name = self.canvasRef().graph_manager.get_uniq_node_name(name)
             self.name = new_name
             self.setHeaderHtml(new_name)
+
+    def get_last_error_message(self):
+        return self._raw_node.get_last_error_message()
 
     def itemChange(self, change, value):
         if change == QtWidgets.QGraphicsItem.ItemPositionChange:

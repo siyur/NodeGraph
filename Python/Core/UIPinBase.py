@@ -28,6 +28,14 @@ def REGISTER_UI_PIN_FACTORY(package_name, factory):
 
 
 class UIPinBase(QtWidgets.QGraphicsWidget):
+    """UI pin wrapper.
+    """
+
+    # Event called when pin is connected
+    OnPinConnected = QtCore.Signal(object)
+    # Event called when pin is disconnected
+    OnPinDisconnected = QtCore.Signal(object)
+
     def __init__(self, owning_node, raw_pin, parent=None):
         super(UIPinBase, self).__init__(parent=parent)
         self.setGraphicsItem(self)
@@ -57,6 +65,14 @@ class UIPinBase(QtWidgets.QGraphicsWidget):
             self._pin_color = QtCore.Qt.white
         self._label_color = QtCore.Qt.white
 
+        self.uiConnectionList = []
+
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Maximum)
+
+    @property
+    def ui_json_data(self):
+        return self._raw_pin.ui_json_data
+
     @property
     def owning_node(self):
         return self.ui_node
@@ -76,6 +92,10 @@ class UIPinBase(QtWidgets.QGraphicsWidget):
     def color(self):
         return self._pin_color
 
+    @property
+    def data_type(self):
+        return self._raw_pin.data_type
+
     def display_name(self):
         return self._display_name
 
@@ -86,6 +106,21 @@ class UIPinBase(QtWidgets.QGraphicsWidget):
             self.prepareGeometryChange()
             self.updateGeometry()
             self.update()
+
+    def setDirty(self):
+        self._raw_pin.setDirty()
+
+    @property
+    def _data(self):
+        return self._raw_pin._data
+
+    @_data.setter
+    def _data(self, value):
+        self._raw_pin._data = value
+
+    @property
+    def affects(self):
+        return self._raw_pin.affects
 
     #=================overriding parent method===============
 
@@ -99,11 +134,19 @@ class UIPinBase(QtWidgets.QGraphicsWidget):
     #=========================
 
     def set_data(self, value):
-        self._raw_pin.setData(value)
+        self._raw_pin.set_data(value)
         self.dataBeenSet.emit(value)
 
     def get_data(self):
         return self._raw_pin.getData()
+
+    def pin_connected(self, other):
+        self.OnPinConnected.emit(other)
+        self.update()
+
+    def pin_disconnected(self, other):
+        self.OnPinDisconnected.emit(other)
+        self.update()
 
     def pinCenter(self):
         """Point relative to pin widget, where circle is drawn."""

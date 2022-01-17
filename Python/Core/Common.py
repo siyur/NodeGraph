@@ -160,6 +160,60 @@ def pinAffects(lhs, rhs):
     rhs.affected_by.add(lhs)
 
 
+def connectPins(src, dst):
+    """**Connects two pins**
+
+    This are the rules how pins connect:
+
+    * Input value pins can have one output connection if :py:class:`PyFlow.Core.Common.PinOptions.AllowMultipleConnections` flag is disabled
+    * Output value pins can have any number of connections
+    * Input execs can have any number of connections
+    * Output execs can have only one connection
+
+    :param src: left hand side pin
+    :type src: :py:class:`PyFlow.Core.PinBase.PinBase`
+    :param dst: right hand side pin
+    :type dst: :py:class:`PyFlow.Core.PinBase.PinBase`
+    :returns: True if connected Successfully
+    :rtype: bool
+    """
+    if src.direction == PinDirection.Input:
+        src, dst = dst, src
+
+    if not canConnectPins(src, dst):
+        return False
+
+    # input value pins can have one output connection if `AllowMultipleConnections` flag is disabled
+    # output value pins can have any number of connections
+    if src.IsValuePin() and dst.IsValuePin():
+        if dst.hasConnections():
+            if not dst.optionEnabled(PinOptions.AllowMultipleConnections):
+                dst.disconnectAll()
+
+    # input execs can have any number of connections
+    # output execs can have only one connection
+    if src.isExec() and dst.isExec():
+        if src.hasConnections():
+            if not src.optionEnabled(PinOptions.AllowMultipleConnections):
+                src.disconnectAll()
+
+    if src.isExec() and dst.isExec():
+        src.onExecute.connect(dst.call)
+
+    dst.aboutToConnect(src)
+    src.aboutToConnect(dst)
+
+    pinAffects(src, dst)
+    src.setDirty()
+
+    dst.setData(src.current_data())
+
+    dst.pin_connected(src)
+    src.pin_connected(dst)
+    push(dst)
+    return True
+
+
 def getConnectedPins(pin):
     """Find all connected Pins to input Pin
 
@@ -275,10 +329,10 @@ def connectPins(src, dst):
     # establish dependencies bitween pins
     pinAffects(src, dst)
 
-    dst.set_data(src.currentData())
+    dst.set_data(src.current_data())
 
-    dst.pinConnected(src)
-    src.pinConnected(dst)
+    dst.pin_connected(src)
+    src.pin_connected(dst)
     return True
 
 def disconnectPins(src, dst):
@@ -300,6 +354,22 @@ def disconnectPins(src, dst):
         dst.pin_disconnected(src)
         return True
     return False
+
+
+def push(start_from):
+    """Marks dirty all ports from start to the right
+
+    this part of graph will be recomputed every tick
+
+    :param start_from: pin from which recursion begins
+    :type start_from: :py:class:`~PyFlow.Core.PinBase.PinBase`
+    """
+    if not len(start_from.affects) == 0:
+        start_from.setDirty()
+        for i in start_from.affects:
+            i.setDirty()
+            push(i)
+
 
 def extractDigitsFromEndOfString(string):
     """Get digits at end of a string

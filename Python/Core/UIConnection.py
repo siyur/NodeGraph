@@ -46,8 +46,8 @@ class UIConnection(QGraphicsPathItem):
 
         self.thickness = 1
         self.thicknessMultiplier = 1
-        if source.isExec():
-            self.thickness = 2
+        # if source.isExec():
+        #     self.thickness = 2
 
         self.pen = QtGui.QPen(self.color, self.thickness, QtCore.Qt.SolidLine, QtCore.Qt.RoundCap, QtCore.Qt.RoundJoin)
 
@@ -61,8 +61,8 @@ class UIConnection(QGraphicsPathItem):
         self.fade = 0.0
         self.source().uiConnectionList.append(self)
         self.destination().uiConnectionList.append(self)
-        self.source().pinConnected(self.destination())
-        self.destination().pinConnected(self.source())
+        self.source().pin_connected(self.destination())
+        self.destination().pin_connected(self.source())
         self.prevPos = None
         self.linPath = None
         self.hOffsetL = 0.0
@@ -78,21 +78,21 @@ class UIConnection(QGraphicsPathItem):
         self.sameSide = 0
         self.hoverSegment = -1
         self.pressedSegment = -1
-        if self.source().isExec():
-            self.bubble = QGraphicsEllipseItem(-2.5, -2.5, 5, 5, self)
-            self.bubble.setBrush(self.color)
-            self.bubble.setPen(self.pen)
-
-            point = self.mPath.pointAtPercent(0.0)
-            self.bubble.setPos(point)
-
-            self.bubble.hide()
-            self.source()._rawPin.onExecute.connect(self.performEvaluationFeedback)
-            self.shouldAnimate = False
-            self.timeline = QtCore.QTimeLine(2000)
-            self.timeline.setFrameRange(0, 100)
-            self.timeline.frameChanged.connect(self.timelineFrameChanged)
-            self.timeline.setLoopCount(0)
+        # if self.source().isExec():
+        #     self.bubble = QGraphicsEllipseItem(-2.5, -2.5, 5, 5, self)
+        #     self.bubble.setBrush(self.color)
+        #     self.bubble.setPen(self.pen)
+        #
+        #     point = self.mPath.pointAtPercent(0.0)
+        #     self.bubble.setPos(point)
+        #
+        #     self.bubble.hide()
+        #     self.source()._raw_pin.onExecute.connect(self.performEvaluationFeedback)
+        #     self.shouldAnimate = False
+        #     self.timeline = QtCore.QTimeLine(2000)
+        #     self.timeline.setFrameRange(0, 100)
+        #     self.timeline.frameChanged.connect(self.timelineFrameChanged)
+        #     self.timeline.setLoopCount(0)
 
     def performEvaluationFeedback(self, *args, **kwargs):
         if self.timeline.state() == QtCore.QTimeLine.State.NotRunning:
@@ -102,7 +102,7 @@ class UIConnection(QGraphicsPathItem):
             self.timeline.start()
 
     def timelineFrameChanged(self, frameNum):
-        percentage = currentProcessorTime() - self.source()._rawPin.getLastExecutionTime()
+        percentage = currentProcessorTime() - self.source()._raw_pin.getLastExecutionTime()
         self.shouldAnimate = percentage < 0.5
         point = self.mPath.pointAtPercent(float(frameNum) / float(self.timeline.endFrame()))
         self.bubble.setPos(point)
@@ -114,8 +114,8 @@ class UIConnection(QGraphicsPathItem):
         super(UIConnection, self).setSelected(value)
 
     def isUnderCollapsedComment(self):
-        srcNode = self.source().owningNode()
-        dstNode = self.destination().owningNode()
+        srcNode = self.source().owning_node()
+        dstNode = self.destination().owning_node()
         srcComment = srcNode.owningCommentNode
         dstComment = dstNode.owningCommentNode
         if srcComment is not None and dstComment is not None and srcComment == dstComment and srcComment.collapsed:
@@ -123,7 +123,7 @@ class UIConnection(QGraphicsPathItem):
         return False
 
     def isUnderActiveGraph(self):
-        return self.canvasRef().graphManager.active_graph() == self.source()._rawPin.owningNode().graph()
+        return self.canvasRef().graphManager.active_graph() == self.source()._raw_pin.owning_node().graph()
 
     def __repr__(self):
         return "{0} -> {1}".format(self.source().getFullName(), self.destination().getFullName())
@@ -133,8 +133,8 @@ class UIConnection(QGraphicsPathItem):
         self.color = color
 
     def updateEndpointsPositions(self):
-        srcNode = self.source().owningNode()
-        dstNode = self.destination().owningNode()
+        srcNode = self.source().owning_node()
+        dstNode = self.destination().owning_node()
 
         srcComment = srcNode.owningCommentNode
         if srcComment is not None:
@@ -176,7 +176,7 @@ class UIConnection(QGraphicsPathItem):
     def Tick(self):
         # check if this instance represents existing connection
         # if not - destroy
-        if not arePinsConnected(self.source()._rawPin, self.destination()._rawPin):
+        if not arePinsConnected(self.source()._raw_pin, self.destination()._raw_pin):
             self.canvasRef().removeConnection(self)
 
         if self.drawSource.isExec() or self.drawDestination.isExec():
@@ -234,8 +234,8 @@ class UIConnection(QGraphicsPathItem):
     def serialize(self):
         script = {'sourceUUID': str(self.source().uid),
                   'destinationUUID': str(self.destination().uid),
-                  'sourceName': self.source()._rawPin.getFullName(),
-                  'destinationName': self.destination()._rawPin.getFullName(),
+                  'sourceName': self.source()._raw_pin.getFullName(),
+                  'destinationName': self.destination()._raw_pin.getFullName(),
                   'uuid': str(self.uid),
                   'hOffsetL': str(self.hOffsetL),
                   'hOffsetR': str(self.hOffsetR),
@@ -250,7 +250,7 @@ class UIConnection(QGraphicsPathItem):
         return script
 
     def __str__(self):
-        return '{0} >>> {1}'.format(self.source()._rawPin.getFullName(), self.destination()._rawPin.getFullName())
+        return '{0} >>> {1}'.format(self.source()._raw_pin.getFullName(), self.destination()._raw_pin.getFullName())
 
     def drawThick(self):
         self.pen.setWidthF(self.thickness + (self.thickness / 1.5))
@@ -316,11 +316,11 @@ class UIConnection(QGraphicsPathItem):
             self.sameSide = 0
             p1n, p2n = p1, p2
             xDistance = p2.x() - p1.x()
-            if self.destination().owningNode()._rawNode.__class__.__name__ in ["reroute", "rerouteExecs"]:
+            if self.destination().owning_node()._raw_node.__class__.__name__ in ["reroute", "rerouteExecs"]:
                 if xDistance < 0:
                     p2n, p1n = p1, p2
                     self.sameSide = 1
-            if self.source().owningNode()._rawNode.__class__.__name__ in ["reroute", "rerouteExecs"]:
+            if self.source().owning_node()._raw_node.__class__.__name__ in ["reroute", "rerouteExecs"]:
                 if xDistance < 0:
                     p1n, p2n = p1, p2
                     self.sameSide = -1
@@ -467,8 +467,8 @@ class UIConnection(QGraphicsPathItem):
             self.mPath.cubicTo(QtCore.QPoint(p1.x() + xDistance / -multiply, p1.y()),
                                QtCore.QPoint(p2.x() - xDistance / -multiply, p2.y()), p2)
         else:
-            self.mPath.cubicTo(QtCore.QPoint(p1.x() + xDistance / multiply,
-                                             p1.y()), QtCore.QPoint(p2.x() - xDistance / 2, p2.y()), p2)
+            self.mPath.cubicTo(QtCore.QPoint(p1.x() + xDistance / multiply, p1.y()),
+                               QtCore.QPoint(p2.x() - xDistance / 2, p2.y()), p2)
 
         self.setPath(self.mPath)
 

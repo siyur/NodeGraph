@@ -7,7 +7,9 @@ from Python.Core.Interface import IPin
 from Python.Core.Common import \
     PinDirection, \
     disconnectPins, \
-    getConnectedPins
+    getConnectedPins, \
+    PinOptions, \
+    push
 
 
 class PinBase(IPin):
@@ -38,6 +40,8 @@ class PinBase(IPin):
         # Access to the node
         self.owning_node = weakref.ref(owning_node)
         self._uid = uuid.uuid4()
+        self._data = None
+        self._default_value = None
         self.dirty = True
         self.affects = set()
         self.affected_by = set()
@@ -48,7 +52,7 @@ class PinBase(IPin):
 
         # gui class weak ref
         self.ui = None
-        self.__ui_Json_data = None
+        self.__ui_json_data = None
 
         # registration
         self.owning_node().pins.add(self)
@@ -60,6 +64,14 @@ class PinBase(IPin):
             self.pin_index = len(self.owning_node().ordered_inputs)
         if direction == PinDirection.Output:
             self.pin_index = len(self.owning_node().ordered_outputs)
+
+    @property
+    def ui_json_data(self):
+        try:
+            dt = self.__ui_json_data.copy()
+            return dt
+        except Exception as e:
+            return None
 
     @property
     def group(self):
@@ -130,6 +142,14 @@ class PinBase(IPin):
                 result.append(connection)
         return result
 
+    @property
+    def data_type(self):
+        """Returns data type of this pin
+
+        :rtype: str
+        """
+        return self.__class__.__name__
+
     def setName(self, name):
         """Sets pin name and fires events
 
@@ -177,7 +197,7 @@ class PinBase(IPin):
         """Marks this pin as invalid by setting error message to it. Also fires event
 
         :param err: Error message
-        :type err: str
+        :type err: Exception
         """
         self._last_error = str(err)
         self.errorOccured.send(self._last_error)
@@ -190,6 +210,15 @@ class PinBase(IPin):
             i.dirty = True
         self.markedAsDirty.send()
 
+    def current_data(self):
+        """Returns current value of this pin, without any graph evaluation
+
+        :rtype: object
+        """
+        if self._data is None:
+            return self._default_value
+        return self._data
+
     def hasConnections(self):
         """Return the number of connections this pin has
 
@@ -201,6 +230,18 @@ class PinBase(IPin):
         elif self.direction == PinDirection.Output:
             num_connections += len(self.affects)
         return num_connections > 0
+
+    def aboutToConnect(self, other):
+        """This method called right before two pins connected
+
+        :param other: Pin which this pin is going to be connected with
+        :type other: :class:`~PyFlow.Core.PinBase.PinBase`
+        """
+        pass
+        # if other.structureType != self.structureType:
+        #     if self.optionEnabled(PinOptions.ChangeTypeOnConnection) or self.structureType == StructureType.Multi:
+        #         self.changeStructure(other._currStructure)
+        #         self.onPinConnected.send(other)
 
     def pin_connected(self, other):
         """
@@ -237,6 +278,64 @@ class PinBase(IPin):
         if self.uid in self.owning_node().pins_creation_order:
             self.owning_node().pins_creation_order.pop(self.uid)
 
+    def set_data(self, data):
+        """Sets value to pin
+
+        :param data: Data to be set
+        :type data: object
+        """
+        # if self.super is None:
+        #     return
+        try:
+            self.setDirty()
+            # if isinstance(data, DictElement) and not self.optionEnabled(PinOptions.DictElementSupported):
+            #     data = data[1]
+            # if not self.isArray() and not self.isDict():
+            #     if isinstance(data, DictElement):
+            #         self._data = DictElement(data[0], self.super.processData(data[1]))
+            #     else:
+            #         if isinstance(data, list):
+            #             self._data = data
+            #         else:
+            #             self._data = self.super.processData(data)
+            # elif self.isArray():
+            #     if isinstance(data, list):
+            #         if self.validateArray(data, self.super.processData):
+            #             self._data = data
+            #         else:
+            #             raise Exception("Some Array Input is not valid Data")
+            #     else:
+            #         self._data = [self.super.processData(data)]
+            # elif self.isDict():
+            #     if isinstance(data, PFDict):
+            #         self._data = PFDict(data.keyType, data.valueType)
+            #         for key, value in data.items():
+            #             self._data[key] = self.super.processData(value)
+            #     elif isinstance(data, DictElement) and len(data) == 2:
+            #         self._data.clear()
+            #         self._data[data[0]] = self.super.processData(data[1])
+
+            if self.direction == PinDirection.Output:
+                for i in self.affects:
+                    i.setData(self.current_data())
+
+            elif self.direction == PinDirection.Input and self.owning_node().__class__.__name__ == "compound":
+                for i in self.affects:
+                    i.setData(self.current_data())
+
+            if self.direction == PinDirection.Input or self.optionEnabled(PinOptions.AlwaysPushDirty):
+                push(self)
+            self.clear_error()
+            self.dataBeenSet.send(self)
+        except Exception as exc:
+            self.set_error(exc)
+            self.setDirty()
+        if self._last_error is not None:
+            self.owning_node().set_error(self._last_error)
+        wrapper = self.owning_node().get_ui()
+        if wrapper:
+            wrapper.update()
+
     def call(self, *args, **kwargs):
         if self.owning_node().is_valid():
             self.onExecute.send(*args, **kwargs)
@@ -250,7 +349,7 @@ class PinBase(IPin):
             'name': self.name,
             'package': self.package_name,
             'fullName': self.get_full_name(),
-            'dataType': self.__class__.__name__,
+            'dataType': self.data_type,
             'direction': int(self.direction),
             'uuid': str(self.uid),
             'linked_to': list(self.linked_to),

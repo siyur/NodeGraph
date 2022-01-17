@@ -134,9 +134,9 @@ class NodeBoxTreeWidget(QtWidgets.QTreeWidget):
         self.clear()
         self.categoryPaths = {}
 
-        dataType = None
+        data_type = None
         if self.canvas.pressedPin is not None:
-            dataType = self.canvas.pressedPin.dataType
+            data_type = self.canvas.pressedPin.data_type
 
         for package_name, package in GET_PACKAGES().items():
             # class based nodes
@@ -147,22 +147,22 @@ class NodeBoxTreeWidget(QtWidgets.QTreeWidget):
                 # checkString = node_class.__name__ + nodeCategoryPath + ''.join(node_class.keywords())
                 # if pattern.lower() not in checkString.lower():
                 #     continue
-                if dataType is None:
+                if data_type is None:
                     self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
                 else:
                     hints = node_class.pin_type_hints()
                     # if pressed pin is output pin
                     # filter by nodes input types
-                    if pin_direction == PinDirection.Output and dataType in hints.input_types:
+                    if pin_direction == PinDirection.Output and data_type in hints.input_types:
                         self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
 
                     # if pressed pin is input pin
                     # filter by nodes output types
-                    elif pin_direction == PinDirection.Input and dataType in hints.output_types:
+                    elif pin_direction == PinDirection.Input and data_type in hints.output_types:
                         self.insertNode(nodeCategoryPath, node_class.__name__, node_class.description())
 
             # expand all categories
-            if dataType is not None:
+            if data_type is not None:
                 for categoryItem in self.categoryPaths.values():
                     categoryItem.setExpanded(True)
             self.sortItems(0, QtCore.Qt.AscendingOrder)
@@ -216,12 +216,12 @@ class NodeBoxTreeWidget(QtWidgets.QTreeWidget):
             pressedPin = self.canvas.pressedPin
             if pressedPin.direction == PinDirection.Input:
                 for pin in node.ui_outputs.values():
-                    wire = self.canvas.connectPinsInternal(pressedPin, pin)
+                    wire = self.canvas.connect_pins_internal(pressedPin, pin)
                     if wire is not None:
                         break
             if pressedPin.direction == PinDirection.Output:
                 for pin in node.ui_inputs.values():
-                    wire = self.canvas.connectPinsInternal(pin, pressedPin)
+                    wire = self.canvas.connect_pins_internal(pin, pressedPin)
                     if wire is not None:
                         break
         else:
