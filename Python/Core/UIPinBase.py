@@ -69,6 +69,9 @@ class UIPinBase(QtWidgets.QGraphicsWidget):
 
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Maximum)
 
+    def get_full_name(self):
+        return self._raw_pin.get_full_name()
+
     @property
     def ui_json_data(self):
         return self._raw_pin.ui_json_data

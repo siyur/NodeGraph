@@ -126,7 +126,7 @@ class UIConnection(QGraphicsPathItem):
         return self.canvasRef().graphManager.active_graph() == self.source()._raw_pin.owning_node().graph()
 
     def __repr__(self):
-        return "{0} -> {1}".format(self.source().getFullName(), self.destination().getFullName())
+        return "{0} -> {1}".format(self.source().get_full_name(), self.destination().get_full_name())
 
     def setColor(self, color):
         self.pen.setColor(color)
