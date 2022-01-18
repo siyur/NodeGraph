@@ -460,6 +460,9 @@ class UINodeBase(QtWidgets.QGraphicsWidget, IUINode):
     def get_last_error_message(self):
         return self._raw_node.get_last_error_message()
 
+    def translate(self, x, y):
+        super(UINodeBase, self).moveBy(x, y)
+
     def itemChange(self, change, value):
         if change == QtWidgets.QGraphicsItem.ItemPositionChange:
             self._raw_node.set_position(value.x(), value.y())

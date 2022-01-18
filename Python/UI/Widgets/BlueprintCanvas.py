@@ -181,7 +181,7 @@ class BlueprintCanvas(CanvasBase):
             return pins[0]
         return None
 
-    def nodeFromInstance(self, instance):
+    def node_from_instance(self, instance):
         if isinstance(instance, UINodeBase):
             return instance
         node = instance
@@ -283,9 +283,9 @@ class BlueprintCanvas(CanvasBase):
     def connect_pins(self, src, dst):
         # Highest level connect pins function
         pass
-        # if src and dst:
-        #     if canConnectPins(src._raw_pin, dst._raw_pin):
-        #         wire = self.connect_pins_internal(src, dst)
+        if src and dst:
+            if canConnectPins(src._raw_pin, dst._raw_pin):
+                wire = self.connect_pins_internal(src, dst)
         #         if wire is not None:
         #             EditorHistory().saveState("Connect pins", modify=True)
 
@@ -313,112 +313,138 @@ class BlueprintCanvas(CanvasBase):
     def mousePressEvent(self, event):
         # TODO: Move navigation part to base class
         self.pressed_item = self.itemAt(event.pos())
-        node = self.nodeFromInstance(self.pressed_item)
+        node = self.node_from_instance(self.pressed_item)
         self.pressedPin = self.findPinNearPosition(event.pos())
         modifiers = event.modifiers()
         self.mousePressPose = event.pos()
 
         current_input_action = InputAction("temp", "temp", InputActionType.Mouse, event.button(), modifiers=modifiers)
-        if any([not self.pressed_item,
-                isinstance(self.pressed_item, UIConnection) and modifiers != QtCore.Qt.AltModifier,
-                isinstance(self.pressed_item, UINodeBase) and not node.collapsed,
-                isinstance(node, UINodeBase) and (node.resizable and node.should_resize(self.mapToScene(event.pos()))["resize"])]):
+
+        # hide nodebox
+        if not isinstance(self.pressed_item, NodesBox) and self.node_box.isVisible():
+            self.node_box.hide()
+            self.node_box.lineEdit.clear()
+
+        # pressed empty space
+        if not self.pressed_item:
+            # selection rect
             self.resizing = False
+            if event.button() == QtCore.Qt.LeftButton and modifiers in [QtCore.Qt.NoModifier,
+                                                                        QtCore.Qt.ShiftModifier,
+                                                                        QtCore.Qt.ControlModifier,
+                                                                        QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier]:
+                self.manipulationMode = CanvasManipulationMode.SELECT
+                self._selectionRect = SelectionRect(graph=self, mouseDownPos=self.mapToScene(event.pos()),
+                                                    modifiers=modifiers)
+                self._selectionRect.selectFullyIntersectedItems = True
+                self._mouseDownSelection = [node for node in self.selectedNodes()]
+                self._mouseDownConnectionsSelection = [node for node in self.selectedConnections()]
+                if modifiers not in [QtCore.Qt.ShiftModifier, QtCore.Qt.ControlModifier]:
+                    self.clearSelection()
+                return
+            else:
+                if hasattr(self, "_selectionRect") and self._selectionRect is not None:
+                    self._selectionRect.destroy()
+                    self._selectionRect = None
+
+        # canvas pan
+        if current_input_action in InputManager()["Canvas.Pan"]:
+            self.manipulationMode = CanvasManipulationMode.PAN
+            self._lastPanPoint = self.mapToScene(event.pos())
+            return
+
+        # canvas zoom
+        if current_input_action in InputManager()["Canvas.Zoom"]:
+            self.manipulationMode = CanvasManipulationMode.ZOOM
+            self._lastTransform = QtGui.QTransform(self.transform())
+            self._lastSceneRect = self.sceneRect()
+            self._lastSceneCenter = self._lastSceneRect.center()
+            self._lastScenePos = self.mapToScene(event.pos())
+            self._lastOffsetFromSceneCenter = self._lastScenePos - self._lastSceneCenter
+            return
+
+        # set connection
+        if isinstance(self.pressed_item, UIConnection) and modifiers != QtCore.Qt.AltModifier:
+            self.resizing = False
+            if modifiers == QtCore.Qt.NoModifier and event.button() == QtCore.Qt.LeftButton:
+                closestPin = self.findPinNearPosition(event.pos(), 20)
+                if closestPin is not None:
+                    if closestPin.direction == PinDirection.Input:
+                        self.pressed_item.destinationPositionOverride = lambda: self.mapToScene(self.mousePos)
+                    elif closestPin.direction == PinDirection.Output:
+                        self.pressed_item.sourcePositionOverride = lambda: self.mapToScene(self.mousePos)
+                    self.reconnectingWires.add(self.pressed_item)
+                return
+
+        if isinstance(self.pressed_item, UINodeBase):
 
             if isinstance(node, UINodeBase) and node.resizable:
                 super(BlueprintCanvas, self).mousePressEvent(event)
                 self.resizing = node.bResize
                 node.setSelected(False)
-            if not self.resizing:
-                if isinstance(self.pressed_item, UIConnection) and modifiers == QtCore.Qt.NoModifier and event.button() == QtCore.Qt.LeftButton:
-                    closestPin = self.findPinNearPosition(event.pos(), 20)
-                    if closestPin is not None:
-                        if closestPin.direction == PinDirection.Input:
-                            self.pressed_item.destinationPositionOverride = lambda: self.mapToScene(self.mousePos)
-                        elif closestPin.direction == PinDirection.Output:
-                            self.pressed_item.sourcePositionOverride = lambda: self.mapToScene(self.mousePos)
-                        self.reconnectingWires.add(self.pressed_item)
-                elif event.button() == QtCore.Qt.LeftButton and modifiers in [QtCore.Qt.NoModifier, QtCore.Qt.ShiftModifier, QtCore.Qt.ControlModifier, QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier]:
-                    self.manipulationMode = CanvasManipulationMode.SELECT
-                    self._selectionRect = SelectionRect(graph=self, mouseDownPos=self.mapToScene(event.pos()), modifiers=modifiers)
-                    self._selectionRect.selectFullyIntersectedItems = True
-                    self._mouseDownSelection = [node for node in self.selectedNodes()]
-                    self._mouseDownConnectionsSelection = [node for node in self.selectedConnections()]
-                    if modifiers not in [QtCore.Qt.ShiftModifier, QtCore.Qt.ControlModifier]:
-                        self.clearSelection()
-                else:
-                    if hasattr(self, "_selectionRect") and self._selectionRect is not None:
-                        self._selectionRect.destroy()
-                        self._selectionRect = None
-                LeftPaning = event.button() == QtCore.Qt.LeftButton and modifiers == QtCore.Qt.AltModifier
-                if current_input_action in InputManager()["Canvas.Pan"]:
-                    self.manipulationMode = CanvasManipulationMode.PAN
-                    self._lastPanPoint = self.mapToScene(event.pos())
-                elif current_input_action in InputManager()["Canvas.Zoom"]:
-                    self.manipulationMode = CanvasManipulationMode.ZOOM
-                    self._lastTransform = QtGui.QTransform(self.transform())
-                    self._lastSceneRect = self.sceneRect()
-                    self._lastSceneCenter = self._lastSceneRect.center()
-                    self._lastScenePos = self.mapToScene(event.pos())
-                    self._lastOffsetFromSceneCenter = self._lastScenePos - self._lastSceneCenter
-            self.node_box.hide()
-        else:
-            if not isinstance(self.pressed_item, NodesBox) and self.node_box.isVisible():
-                # hide nodebox
-                self.node_box.hide()
-                self.node_box.lineEdit.clear()
 
-            # pressed on a pin
-            if isinstance(self.pressed_item, UIPinBase):
-                if event.button() == QtCore.Qt.LeftButton and modifiers == QtCore.Qt.NoModifier:
-                    self.pressed_item.topLevelItem().setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, False)
-                    self.pressed_item.topLevelItem().setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, False)
-                    self._drawRealtimeLine = True
-                elif event.button() == QtCore.Qt.LeftButton and modifiers == QtCore.Qt.ControlModifier:
-                    for wire in self.pressed_item.uiConnectionList:
-                        if self.pressed_item.direction == PinDirection.Input:
-                            wire.destinationPositionOverride = lambda: self.mapToScene(self.mousePos)
-                        elif self.pressed_item.direction == PinDirection.Output:
-                            wire.sourcePositionOverride = lambda: self.mapToScene(self.mousePos)
-                        self.reconnectingWires.add(wire)
-                if current_input_action in InputManager()["Canvas.DisconnectPin"]:
-                    self.removeEdgeCmd(self.pressed_item.connections)
-                    self._drawRealtimeLine = False
-            else:
-                if isinstance(self.pressed_item, UIConnection) and modifiers == QtCore.Qt.AltModifier:
-                    # TODO: actions for rerout node was here, but we don't need to consider it at this point
-                    pass
-                else:
-                    if isinstance(self.pressed_item, UINodeBase):
-                        if node.bResize:
-                            return
+            # drag chained nodes
+            if current_input_action in InputManager()["Canvas.DragChainedNodes"]:
+                if modifiers != QtCore.Qt.ShiftModifier:
+                    self.clearSelection()
+                node.setSelected(True)
+                selectedNodes = self.selectedNodes()
+                if len(selectedNodes) > 0:
+                    for snode in selectedNodes:
+                        for n in node.getChainedNodes():
+                            n.setSelected(True)
+                        snode.setSelected(True)
+                self.manipulationMode = CanvasManipulationMode.MOVE
+                return
 
-                    if current_input_action in InputManager()["Canvas.DragChainedNodes"]:
-                        if modifiers != QtCore.Qt.ShiftModifier:
-                            self.clearSelection()
-                        node.setSelected(True)
-                        selectedNodes = self.selectedNodes()
-                        if len(selectedNodes) > 0:
-                            for snode in selectedNodes:
-                                for n in node.getChainedNodes():
-                                    n.setSelected(True)
-                                snode.setSelected(True)
-                        self.manipulationMode = CanvasManipulationMode.MOVE
-                        return
-                    else:
-                        if modifiers in [QtCore.Qt.NoModifier, QtCore.Qt.AltModifier]:
-                            super(BlueprintCanvas, self).mousePressEvent(event)
-                        if modifiers == QtCore.Qt.ControlModifier and event.button() == QtCore.Qt.LeftButton:
-                            node.setSelected(not node.isSelected())
-                        if modifiers == QtCore.Qt.ShiftModifier:
-                            node.setSelected(True)
-                    if current_input_action in InputManager()["Canvas.DragNodes"] and isinstance(self.pressed_item, UINodeBase):
-                        self.manipulationMode = CanvasManipulationMode.MOVE
-                        if self.pressed_item.objectName() == "MouseLocked":
-                            super(BlueprintCanvas, self).mousePressEvent(event)
+            if modifiers in [QtCore.Qt.NoModifier, QtCore.Qt.AltModifier]:
+                super(BlueprintCanvas, self).mousePressEvent(event)
+            if modifiers == QtCore.Qt.ControlModifier and event.button() == QtCore.Qt.LeftButton:
+                node.setSelected(not node.isSelected())
+            if modifiers == QtCore.Qt.ShiftModifier:
+                node.setSelected(True)
 
-                    if current_input_action in InputManager()["Canvas.DragCopyNodes"]:
-                        self.manipulationMode = CanvasManipulationMode.COPY
+            if node.bResize:
+                return
+
+            if current_input_action in InputManager()["Canvas.DragNodes"]:
+                self.manipulationMode = CanvasManipulationMode.MOVE
+                if self.pressed_item.objectName() == "MouseLocked":
+                    super(BlueprintCanvas, self).mousePressEvent(event)
+                return
+
+            # drag copy node
+            if current_input_action in InputManager()["Canvas.DragCopyNodes"]:
+                self.manipulationMode = CanvasManipulationMode.COPY
+                return
+
+            # resize node
+            if node.resizable and node.should_resize(self.mapToScene(event.pos()))["resize"]:
+                self.resizing = False
+                if isinstance(node, UINodeBase) and node.resizable:
+                    super(BlueprintCanvas, self).mousePressEvent(event)
+                self.resizing = node.bResize
+                node.setSelected(False)
+                return
+
+        # pressed on a pin
+        if isinstance(self.pressed_item, UIPinBase):
+            if event.button() == QtCore.Qt.LeftButton and modifiers == QtCore.Qt.NoModifier:
+                self.pressed_item.topLevelItem().setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, False)
+                self.pressed_item.topLevelItem().setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, False)
+                self._drawRealtimeLine = True
+            elif event.button() == QtCore.Qt.LeftButton and modifiers == QtCore.Qt.ControlModifier:
+                for wire in self.pressed_item.uiConnectionList:
+                    if self.pressed_item.direction == PinDirection.Input:
+                        wire.destinationPositionOverride = lambda: self.mapToScene(self.mousePos)
+                    elif self.pressed_item.direction == PinDirection.Output:
+                        wire.sourcePositionOverride = lambda: self.mapToScene(self.mousePos)
+                    self.reconnectingWires.add(wire)
+            if current_input_action in InputManager()["Canvas.DisconnectPin"]:
+                self.removeEdgeCmd(self.pressed_item.connections)
+                self._drawRealtimeLine = False
+
+        self.resizing = False
 
     def mouseReleaseEvent(self, event):
         super(BlueprintCanvas, self).mouseReleaseEvent(event)
@@ -429,7 +455,6 @@ class BlueprintCanvas(CanvasBase):
         self.mouseReleasePos = event.pos()
         self.released_item = self.itemAt(event.pos())
         self.releasedPin = self.findPinNearPosition(event.pos())
-
 
         if len(self.reconnectingWires) > 0:
             if self.releasedPin is not None:
@@ -450,6 +475,11 @@ class BlueprintCanvas(CanvasBase):
                 wire.sourcePositionOverride = None
                 wire.destinationPositionOverride = None
             self.reconnectingWires.clear()
+
+        for n in self.get_all_nodes():
+            # if not n.isCommentNode:
+            n.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable)
+            n.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable)
 
         if self._drawRealtimeLine:
             self._drawRealtimeLine = False
@@ -497,8 +527,8 @@ class BlueprintCanvas(CanvasBase):
 
         # We don't want properties view go crazy
         # check if same node pressed and released left mouse button and not moved
-        releasedNode = self.nodeFromInstance(self.released_item)
-        pressedNode = self.nodeFromInstance(self.pressed_item)
+        releasedNode = self.node_from_instance(self.released_item)
+        pressedNode = self.node_from_instance(self.pressed_item)
         manhattanLengthTest = (self.mousePressPose - event.pos()).manhattanLength() <= 2
         if all([event.button() == QtCore.Qt.LeftButton, releasedNode is not None, pressedNode is not None, pressedNode == releasedNode, manhattanLengthTest]):
             pass
@@ -516,7 +546,7 @@ class BlueprintCanvas(CanvasBase):
         mouseDelta = QtCore.QPointF(self.mousePos) - self._lastMousePos
         modifiers = event.modifiers()
         itemUnderMouse = self.itemAt(event.pos())
-        node = self.nodeFromInstance(itemUnderMouse)
+        node = self.node_from_instance(itemUnderMouse)
         if itemUnderMouse and isinstance(node, UINodeBase) and node.resizable:
             resizeOpts = node.should_resize(self.mapToScene(event.pos()))
             if resizeOpts["resize"] or node.bResize:
@@ -671,23 +701,23 @@ class BlueprintCanvas(CanvasBase):
                 for node in selectedNodes:
                     node.translate(scaledDelta.x(), scaledDelta.y())
 
-            if node.isReroute() and modifiers == QtCore.Qt.AltModifier:
-                mouseRect = QtCore.QRect(QtCore.QPoint(event.pos().x() - 1, event.pos().y() - 1),
-                                         QtCore.QPoint(event.pos().x() + 1, event.pos().y() + 1))
-                hoverItems = self.items(mouseRect)
-                newOuts = []
-                newIns = []
-                for item in hoverItems:
-                    if isinstance(item, UIConnection):
-                        if list(node.ui_inputs.values())[0].connections and list(node.ui_outputs.values())[0].connections:
-                            if item.source() == list(node.ui_inputs.values())[0].connections[0].source():
-                                newOuts.append([item.destination(), item.drawDestination])
-                            if item.destination() == list(node.ui_outputs.values())[0].connections[0].destination():
-                                newIns.append([item.source(), item.drawSource])
-                for out in newOuts:
-                    self.connect_pins(list(node.ui_outputs.values())[0], out[0])
-                for inp in newIns:
-                    self.connect_pins(inp[0], list(node.ui_inputs.values())[0])
+                    if node.isReroute() and modifiers == QtCore.Qt.AltModifier:
+                        mouseRect = QtCore.QRect(QtCore.QPoint(event.pos().x() - 1, event.pos().y() - 1),
+                                                 QtCore.QPoint(event.pos().x() + 1, event.pos().y() + 1))
+                        hoverItems = self.items(mouseRect)
+                        newOuts = []
+                        newIns = []
+                        for item in hoverItems:
+                            if isinstance(item, UIConnection):
+                                if list(node.ui_inputs.values())[0].connections and list(node.ui_outputs.values())[0].connections:
+                                    if item.source() == list(node.ui_inputs.values())[0].connections[0].source():
+                                        newOuts.append([item.destination(), item.drawDestination])
+                                    if item.destination() == list(node.ui_outputs.values())[0].connections[0].destination():
+                                        newIns.append([item.source(), item.drawSource])
+                        for out in newOuts:
+                            self.connect_pins(list(node.ui_outputs.values())[0], out[0])
+                        for inp in newIns:
+                            self.connect_pins(inp[0], list(node.ui_inputs.values())[0])
         elif self.manipulationMode == CanvasManipulationMode.PAN:
             self.pan(mouseDelta)
         elif self.manipulationMode == CanvasManipulationMode.ZOOM:
@@ -844,7 +874,7 @@ class BlueprintCanvas(CanvasBase):
             nodeType = jsonData["type"]
             libName = jsonData['lib']
             name = nodeType
-            dropItem = self.nodeFromInstance(self.itemAt(scenePos.toPoint()))
+            dropItem = self.node_from_instance(self.itemAt(scenePos.toPoint()))
             if not dropItem or isinstance(dropItem, UINodeBase) or isinstance(dropItem, UIPinBase) or isinstance(dropItem, UIConnection):
                 node_template = NodeBase.json_template()
                 node_template['package'] = packageName

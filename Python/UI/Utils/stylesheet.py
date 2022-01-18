@@ -76,7 +76,7 @@ class editableStyleSheet():
         self.PinSwitch = [3]
         self.CanvasSwitch = [3]
 
-        self.ConnectionMode = [ConnectionTypes.Circuit]
+        self.ConnectionMode = [ConnectionTypes.Cubic]
         self.ConnectionRoundness = [5]
         self.ConnectionOffset = [20]
 
