@@ -908,8 +908,8 @@ class BlueprintCanvas(CanvasBase):
                     node.setPos(x - node.boundingRect().width(), y)
                     for inp in nodeInputs.values():
                         if canConnectPins(dropItem._raw_pin, inp._raw_pin):
-                            if dropItem.isExec():
-                                dropItem._raw_pin.disconnectAll()
+                            # if dropItem.isExec():
+                            #     dropItem._raw_pin.disconnectAll()
                             self.connect_pins(dropItem, inp)
                             node.setPos(x + node.boundingRect().width(), y)
                             break
@@ -921,8 +921,8 @@ class BlueprintCanvas(CanvasBase):
                 elif isinstance(dropItem, UIConnection):
                     for inp in nodeInputs.values():
                         if canConnectPins(dropItem.source()._raw_pin, inp._raw_pin):
-                            if dropItem.source().isExec():
-                                dropItem.source()._raw_pin.disconnectAll()
+                            # if dropItem.source().isExec():
+                            #     dropItem.source()._raw_pin.disconnectAll()
                             self.connect_pins(dropItem.source(), inp)
                             break
                     for out in nodeOutputs.values():
